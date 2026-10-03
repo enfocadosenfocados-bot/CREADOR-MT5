@@ -1,0 +1,8 @@
+{
+  "terminal_url": "http://127.0.0.1:22346/mcp",
+  "terminal_token": "YOUR_TERMINAL_MCP_BEARER_TOKEN",
+  "metaeditor_url": "http://127.0.0.1:22345/mcp",
+  "metaeditor_token": "YOUR_METAEDITOR_MCP_BEARER_TOKEN",
+  "metaeditor_exe": "C:\\Program Files\\MetaTrader 5\\MetaEditor64.exe",
+  "gemini_api_key": "YOUR_GEMINI_API_KEY_OPTIONAL"
+}

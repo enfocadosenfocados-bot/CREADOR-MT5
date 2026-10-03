@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Local credentials & configs
+config.json
+.env
+
+# Uploads & temporary test logs
+uploads/*
+!uploads/.gitkeep
+*.log
+*.ini
+*.set
+
+# OS
+Thumbs.db
+.DS_Store

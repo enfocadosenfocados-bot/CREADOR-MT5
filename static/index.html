@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trading Strategy Studio | AI Multimodal, Scraper & MT5 MCP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+              900: '#064e3b',
+              accent: '#38bdf8'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    pre, code, .font-mono { font-family: 'JetBrains Mono', monospace; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- Top Navbar -->
+  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40 px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-sky-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+        <i class="fa-solid fa-chart-line text-white text-lg"></i>
+      </div>
+      <div>
+        <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-2">
+          TRADING STRATEGY STUDIO
+          <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono border border-emerald-500/30">AI + SCRAPER + MT5 MCP</span>
+        </h1>
+        <p class="text-xs text-slate-400">Extractor Multimodal &bull; Scraper Global &bull; Generador MQL5 &bull; Strategy Tester MT5</p>
+      </div>
+    </div>
+
+    <!-- Right Controls: MT5 Live Widget & Settings Button -->
+    <div class="flex items-center space-x-3">
+      <!-- Live MT5 Status Widget -->
+      <div id="mt5StatusBadge" class="flex items-center space-x-3 bg-slate-800/80 px-4 py-2 rounded-xl border border-slate-700">
+        <div class="flex items-center space-x-2">
+          <span class="relative flex h-2.5 w-2.5">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+          </span>
+          <span class="text-xs font-medium text-emerald-400" id="terminalStatusText">MT5 Conectado</span>
+        </div>
+        <div class="h-4 w-px bg-slate-700"></div>
+        <div class="text-xs text-slate-300 font-mono" id="accountSummary">
+          Cargando cuenta...
+        </div>
+      </div>
+
+      <!-- Config / MCP Switch Button -->
+      <button onclick="openConfigModal()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-medium flex items-center gap-2 transition">
+        <i class="fa-solid fa-sliders text-emerald-400"></i> Configurar MCP
+      </button>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <div class="bg-slate-900 border-b border-slate-800 px-6">
+    <nav class="flex space-x-2 overflow-x-auto" id="tabNav">
+      <button onclick="switchTab('tab-ingest')" id="btn-tab-ingest" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-emerald-500 text-emerald-400 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-cloud-arrow-down"></i> 1. Ingesta (Video / PDF / Link)
+      </button>
+      <button onclick="switchTab('tab-radar')" id="btn-tab-radar" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-radar text-sky-400"></i> 2. Radar & Scraping Global
+      </button>
+      <button onclick="switchTab('tab-mql5')" id="btn-tab-mql5" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-code"></i> 3. Estrategia & MQL5
+      </button>
+      <button onclick="switchTab('tab-backtest')" id="btn-tab-backtest" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-flask"></i> 4. Backtest en MT5
+      </button>
+      <button onclick="switchTab('tab-results')" id="btn-tab-results" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-square-poll-vertical"></i> 5. Métricas & Veredicto
+      </button>
+    </nav>
+  </div>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 p-6 max-w-7xl mx-auto w-full">
+
+    <!-- TAB 1: INGESTA MULTIMODAL -->
+    <section id="tab-ingest" class="tab-pane space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <div class="lg:col-span-2 space-y-5 bg-slate-900 p-6 rounded-2xl border border-slate-800">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+              <i class="fa-solid fa-wand-magic-sparkles text-emerald-400"></i> Entrada de Estrategia
+            </h2>
+            <div class="flex bg-slate-800 p-1 rounded-lg border border-slate-700 text-xs">
+              <button onclick="setIngestMode('url')" id="mode-url" class="px-3 py-1.5 rounded-md bg-emerald-600 text-white font-medium">Link / Video</button>
+              <button onclick="setIngestMode('pdf')" id="mode-pdf" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-white">PDF / E-Book</button>
+              <button onclick="setIngestMode('text')" id="mode-text" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-white">Texto / Prompt</button>
+            </div>
+          </div>
+
+          <!-- Mode URL -->
+          <div id="container-url" class="space-y-4">
+            <p class="text-xs text-slate-400">Pega cualquier enlace de YouTube, TikTok, Instagram Reel o Facebook Reel:</p>
+            <div class="flex gap-2">
+              <div class="relative flex-1">
+                <i class="fa-brands fa-youtube absolute left-3.5 top-3.5 text-slate-500"></i>
+                <input type="text" id="inputUrl" placeholder="https://www.youtube.com/watch?v=... o Reel URL" 
+                       class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono">
+              </div>
+              <button onclick="processUrl()" id="btnProcessUrl" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold flex items-center gap-2 shadow-lg shadow-emerald-600/20">
+                <i class="fa-solid fa-bolt"></i> Extraer Estrategia
+              </button>
+            </div>
+          </div>
+
+          <!-- Mode PDF -->
+          <div id="container-pdf" class="space-y-4 hidden">
+            <p class="text-xs text-slate-400">Arrastra o sube un documento PDF con las reglas de tu estrategia:</p>
+            <div id="dropzone" onclick="document.getElementById('pdfInput').click()" 
+                 class="border-2 border-dashed border-slate-700 hover:border-emerald-500 rounded-2xl p-8 text-center cursor-pointer transition bg-slate-950/50">
+              <i class="fa-solid fa-file-pdf text-4xl text-emerald-400 mb-3"></i>
+              <p class="text-sm font-medium text-slate-200">Haz clic para seleccionar o arrastra tu PDF aquí</p>
+              <p class="text-xs text-slate-500 mt-1">Soporta guías, libros y documentos de trading</p>
+              <input type="file" id="pdfInput" accept=".pdf" class="hidden" onchange="handlePdfUpload(event)">
+            </div>
+            <div id="pdfSelectedName" class="text-xs text-emerald-400 font-mono hidden"></div>
+          </div>
+
+          <!-- Mode Text -->
+          <div id="container-text" class="space-y-4 hidden">
+            <p class="text-xs text-slate-400">Escribe o pega libremente la descripción de la estrategia:</p>
+            <textarea id="inputText" rows="6" placeholder="Ejemplo: Comprar cuando la EMA 9 cruce hacia arriba la EMA 21 en timeframe M15..." 
+                      class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3.5 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"></textarea>
+            <div class="flex justify-between items-center">
+              <div class="flex gap-2">
+                <button onclick="loadSampleStrategy(1)" class="text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700">Ejemplo 1: EMA Cross</button>
+                <button onclick="loadSampleStrategy(2)" class="text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700">Ejemplo 2: RSI Pullback</button>
+              </div>
+              <button onclick="processText()" id="btnProcessText" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold flex items-center gap-2">
+                <i class="fa-solid fa-brain"></i> Formalizar con IA
+              </button>
+            </div>
+          </div>
+
+          <!-- Progress / Status display -->
+          <div id="extractionProgress" class="hidden p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-xs text-slate-300">
+              <span id="extractionStatusLabel" class="flex items-center gap-2">
+                <i class="fa-solid fa-circle-notch fa-spin text-emerald-400"></i> Procesando y analizando material con IA...
+              </span>
+            </div>
+            <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+              <div class="bg-gradient-to-r from-emerald-500 to-sky-500 h-full w-2/3 animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Strategy Quick Overview right col -->
+        <div class="space-y-4 bg-slate-900 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between">
+          <div>
+            <h3 class="text-sm font-semibold text-slate-300 flex items-center gap-2 mb-3">
+              <i class="fa-solid fa-layer-group text-sky-400"></i> Estrategia Actual
+            </h3>
+            <div id="quickStrategyPreview" class="text-xs text-slate-400 space-y-3 font-mono">
+              <div class="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span class="text-slate-500 block mb-1">Nombre:</span>
+                <span id="prevName" class="text-white font-semibold">Ninguna cargada</span>
+              </div>
+              <div class="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span class="text-slate-500 block mb-1">Activo & Timeframe:</span>
+                <span id="prevTf" class="text-emerald-400">-</span>
+              </div>
+              <div class="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span class="text-slate-500 block mb-1">Indicadores detectados:</span>
+                <span id="prevIndicators" class="text-slate-300">-</span>
+              </div>
+            </div>
+          </div>
+
+          <button onclick="switchTab('tab-mql5')" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-2 transition border border-slate-700">
+            Ver Código MQL5 y Reglas <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 2: RADAR & SCRAPING GLOBAL -->
+    <section id="tab-radar" class="tab-pane space-y-6 hidden">
+      <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-6">
+        
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+              <i class="fa-solid fa-radar text-sky-400 animate-spin-slow"></i> Radar & Scraping Exhaustivo de Estrategias
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">Busca y extrae estrategias virales y rentables de YouTube, TikTok, Reddit, Forex Factory y TradingView.</p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button onclick="searchStrategies('Scalping M5 EMA')" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">Scalping M5</button>
+            <button onclick="searchStrategies('SMC Order Block')" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">SMC / ICT</button>
+            <button onclick="searchStrategies('RSI Bollinger Breakout')" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">RSI Breakout</button>
+          </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="flex gap-3">
+          <div class="relative flex-1">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3.5 text-slate-500"></i>
+            <input type="text" id="scraperQuery" placeholder="Buscar estrategia (ej. ICT Silver Bullet, Scalping 1 minuto, Trend Following)..." 
+                   class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500 font-mono">
+          </div>
+          <select id="scraperCategory" class="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-sky-500 font-mono">
+            <option value="all">Todas las Fuentes</option>
+            <option value="video">Videos (YouTube / TikTok / Reels)</option>
+            <option value="web">Foros & Web (Reddit / ForexFactory)</option>
+          </select>
+          <button onclick="executeScraperSearch()" id="btnScraperSearch" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-semibold text-sm flex items-center gap-2 shadow-lg shadow-sky-600/20">
+            <i class="fa-solid fa-satellite-dish"></i> Escanear
+          </button>
+        </div>
+
+        <!-- Scraping Results Grid -->
+        <div id="scraperResultsArea" class="space-y-4">
+          <div id="scraperLoading" class="hidden p-8 text-center">
+            <i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-400 mb-3"></i>
+            <p class="text-sm text-slate-300">Rastreando comunidades, foros y canales de trading...</p>
+          </div>
+
+          <div id="scraperGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 3: ESTRATEGIA & MQL5 CODE -->
+    <section id="tab-mql5" class="tab-pane space-y-6 hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Left: Strategy Breakdown -->
+        <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
+          <h3 class="text-base font-semibold text-white flex items-center gap-2">
+            <i class="fa-solid fa-list-check text-emerald-400"></i> Reglas de la Estrategia
+          </h3>
+
+          <div class="space-y-3 text-xs">
+            <div>
+              <label class="text-slate-400 font-medium block mb-1">Nombre del EA</label>
+              <input type="text" id="mqlName" value="AI_Strategy" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-mono">
+            </div>
+
+            <div>
+              <label class="text-slate-400 font-medium block mb-1">Condición Compra (Long)</label>
+              <div id="logicBuy" class="bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-emerald-300 font-mono text-[11px] leading-relaxed break-all">
+                buf_fast_ema[0] > buf_slow_ema[0]
+              </div>
+            </div>
+
+            <div>
+              <label class="text-slate-400 font-medium block mb-1">Condición Venta (Short)</label>
+              <div id="logicSell" class="bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-rose-300 font-mono text-[11px] leading-relaxed break-all">
+                buf_fast_ema[0] < buf_slow_ema[0]
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 pt-2">
+              <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+                <span class="text-slate-500 block text-[10px]">Stop Loss</span>
+                <span id="logicSL" class="text-white font-mono font-medium">25 pips</span>
+              </div>
+              <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+                <span class="text-slate-500 block text-[10px]">Take Profit</span>
+                <span id="logicTP" class="text-white font-mono font-medium">50 pips</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-4 border-t border-slate-800">
+            <button onclick="compileMql5()" id="btnCompile" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20">
+              <i class="fa-solid fa-gears"></i> Compilar MQL5 en MetaTrader 5
+            </button>
+            <div id="compileFeedback" class="mt-3 text-xs font-mono p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hidden"></div>
+          </div>
+        </div>
+
+        <!-- Right: MQL5 Code Viewer & Editor -->
+        <div class="lg:col-span-2 bg-slate-900 rounded-2xl border border-slate-800 flex flex-col overflow-hidden">
+          <div class="bg-slate-950 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+              <span class="text-xs font-mono text-slate-300" id="mqlFileName">strategy.mq5</span>
+            </div>
+            <button onclick="copyMqlCode()" class="text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 flex items-center gap-1.5">
+              <i class="fa-regular fa-copy"></i> Copiar Código
+            </button>
+          </div>
+          <div class="p-4 flex-1">
+            <textarea id="mqlCodeEditor" class="w-full h-[450px] bg-slate-950 text-slate-200 font-mono text-xs p-4 rounded-xl border border-slate-800 focus:outline-none focus:border-emerald-500 resize-none leading-relaxed"></textarea>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 4: BACKTESTING EN MT5 -->
+    <section id="tab-backtest" class="tab-pane space-y-6 hidden">
+      <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-6">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+            <i class="fa-solid fa-play text-emerald-400"></i> Configuración de Backtest en MetaTrader 5
+          </h2>
+          <span class="text-xs text-slate-400 font-mono">Terminal MCP Strategy Tester</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 text-xs">
+          <div>
+            <label class="text-slate-400 font-medium block mb-1.5">Símbolo / Par</label>
+            <select id="btSymbol" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white font-mono focus:border-emerald-500">
+              <option value="EURUSD">EURUSD</option>
+              <option value="GBPUSD" selected>GBPUSD</option>
+              <option value="USDJPY">USDJPY</option>
+              <option value="XAUUSD">XAUUSD (Oro)</option>
+              <option value="BTCUSD">BTCUSD</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="text-slate-400 font-medium block mb-1.5">Timeframe</label>
+            <select id="btTimeframe" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white font-mono focus:border-emerald-500">
+              <option value="M5">M5 (5 Minutos)</option>
+              <option value="M15">M15 (15 Minutos)</option>
+              <option value="H1" selected>H1 (1 Hora)</option>
+              <option value="H4">H4 (4 Horas)</option>
+              <option value="D1">D1 (Diario)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="text-slate-400 font-medium block mb-1.5">Desde (YYYY.MM.DD)</label>
+            <input type="text" id="btFromDate" value="2026.08.01" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white font-mono focus:border-emerald-500">
+          </div>
+
+          <div>
+            <label class="text-slate-400 font-medium block mb-1.5">Hasta (YYYY.MM.DD)</label>
+            <input type="text" id="btToDate" value="2026.09.09" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white font-mono focus:border-emerald-500">
+          </div>
+
+          <div>
+            <label class="text-slate-400 font-medium block mb-1.5">Depósito Inicial (USD)</label>
+            <input type="number" id="btDeposit" value="10000" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white font-mono focus:border-emerald-500">
+          </div>
+
+          <div>
+            <label class="text-slate-400 font-medium block mb-1.5">Apalancamiento</label>
+            <select id="btLeverage" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white font-mono focus:border-emerald-500">
+              <option value="50">1:50</option>
+              <option value="100" selected>1:100</option>
+              <option value="500">1:500</option>
+            </select>
+          </div>
+
+          <div class="md:col-span-2">
+            <label class="text-slate-400 font-medium block mb-1.5">Modelo de Simulación</label>
+            <select id="btModel" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white font-mono focus:border-emerald-500">
+              <option value="1" selected>OHLC en 1 minuto (Rápido y de alta precisión)</option>
+              <option value="0">Cada tick basado en ticks reales (Ultra preciso institucional)</option>
+              <option value="2">Sólo precios de apertura</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="pt-4 flex items-center justify-between border-t border-slate-800">
+          <div class="text-xs text-slate-400 flex items-center gap-2">
+            <i class="fa-solid fa-shield-halved text-emerald-400"></i> Ejecución nativa mediante Strategy Tester de MetaTrader 5
+          </div>
+          <button onclick="startBacktest()" id="btnStartBacktest" class="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-sky-600 hover:from-emerald-500 hover:to-sky-500 text-white font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-600/20">
+            <i class="fa-solid fa-play"></i> Iniciar Backtest en MT5
+          </button>
+        </div>
+
+        <!-- Backtest Live Monitor -->
+        <div id="btMonitor" class="hidden p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between text-xs font-mono">
+            <span class="text-slate-300 flex items-center gap-2" id="btMonitorStatus">
+              <i class="fa-solid fa-spinner fa-spin text-emerald-400"></i> Simulando trades en Strategy Tester...
+            </span>
+            <span class="text-slate-500" id="btRunIdBadge">Run ID: -</span>
+          </div>
+          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+            <div id="btProgressBar" class="bg-gradient-to-r from-emerald-500 to-sky-500 h-full w-1/4 transition-all duration-300"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: MÉTRICAS & VEREDICTO DE LA IA -->
+    <section id="tab-results" class="tab-pane space-y-6 hidden">
+      
+      <!-- Key Performance Metrics Cards -->
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
+          <span class="text-xs text-slate-400 block mb-1">Beneficio Neto</span>
+          <span id="resProfit" class="text-xl font-bold font-mono text-emerald-400">$0.00</span>
+        </div>
+        <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
+          <span class="text-xs text-slate-400 block mb-1">Profit Factor</span>
+          <span id="resProfitFactor" class="text-xl font-bold font-mono text-white">0.00</span>
+        </div>
+        <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
+          <span class="text-xs text-slate-400 block mb-1">Max Drawdown</span>
+          <span id="resDrawdown" class="text-xl font-bold font-mono text-rose-400">0.00%</span>
+        </div>
+        <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
+          <span class="text-xs text-slate-400 block mb-1">Win Rate %</span>
+          <span id="resWinRate" class="text-xl font-bold font-mono text-sky-400">0.0%</span>
+        </div>
+        <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
+          <span class="text-xs text-slate-400 block mb-1">Total Operaciones</span>
+          <span id="resTrades" class="text-xl font-bold font-mono text-white">0</span>
+        </div>
+        <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
+          <span class="text-xs text-slate-400 block mb-1">Ratio Sharpe</span>
+          <span id="resSharpe" class="text-xl font-bold font-mono text-slate-300">0.00</span>
+        </div>
+      </div>
+
+      <!-- Equity Curve Chart & AI Verdict -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 bg-slate-900 p-6 rounded-2xl border border-slate-800 flex flex-col">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-base font-semibold text-white flex items-center gap-2">
+              <i class="fa-solid fa-chart-area text-emerald-400"></i> Curva de Balance & Equidad
+            </h3>
+            <span class="text-xs font-mono text-slate-400">Generado en MetaTrader 5</span>
+          </div>
+          <div class="flex-1 min-h-[320px]">
+            <canvas id="equityChart"></canvas>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4 flex flex-col justify-between">
+          <div>
+            <h3 class="text-base font-semibold text-white flex items-center gap-2 mb-3">
+              <i class="fa-solid fa-microchip text-sky-400"></i> Auditoría & Veredicto AI
+            </h3>
+
+            <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+              <span class="text-xs text-slate-500 block">Evaluación de Robustez:</span>
+              <div id="aiVerdictBadge" class="text-sm font-bold font-mono text-emerald-400 flex items-center gap-2">
+                <i class="fa-solid fa-circle-check"></i> Esperando resultados...
+              </div>
+              <p id="aiVerdictDesc" class="text-xs text-slate-300 leading-relaxed">
+                Ejecuta un backtest en la pestaña 4 para que el auditor evalúe el drawdown, factor de recuperación y consistencia del edge.
+              </p>
+            </div>
+          </div>
+
+          <button onclick="switchTab('tab-backtest')" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-2">
+            <i class="fa-solid fa-sliders"></i> Ajustar Parámetros y Re-testear
+          </button>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- MODAL: CONFIGURAR MCP DINÁMICO -->
+  <div id="configModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl p-6 space-y-5 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-semibold text-white flex items-center gap-2">
+          <i class="fa-solid fa-sliders text-emerald-400"></i> Ajustes de Conexión MCP (MT5 & MetaEditor)
+        </h3>
+        <button onclick="closeConfigModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        <div>
+          <label class="text-slate-300 font-medium block mb-1">URL de Terminal MT5 MCP</label>
+          <input type="text" id="cfgTerminalUrl" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+        </div>
+
+        <div>
+          <label class="text-slate-300 font-medium block mb-1">Bearer Token Terminal</label>
+          <input type="password" id="cfgTerminalToken" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+        </div>
+
+        <div>
+          <label class="text-slate-300 font-medium block mb-1">URL de MetaEditor MCP</label>
+          <input type="text" id="cfgMetaEditorUrl" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+        </div>
+
+        <div>
+          <label class="text-slate-300 font-medium block mb-1">Bearer Token MetaEditor</label>
+          <input type="password" id="cfgMetaEditorToken" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+        </div>
+
+        <div>
+          <label class="text-slate-300 font-medium block mb-1">Ruta MetaEditor64.exe</label>
+          <input type="text" id="cfgMetaEditorExe" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+        </div>
+
+        <div>
+          <label class="text-slate-300 font-medium block mb-1">Google Gemini API Key (Opcional para Extracción Multimodal Avanzada)</label>
+          <input type="password" id="cfgGeminiKey" placeholder="AIzaSy..." class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white font-mono">
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+        <span id="configFeedback" class="text-xs font-mono text-emerald-400"></span>
+        <div class="flex gap-2">
+          <button onclick="closeConfigModal()" class="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs">Cancelar</button>
+          <button onclick="saveConfigModal()" id="btnSaveConfig" class="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-600/20">
+            <i class="fa-solid fa-floppy-disk"></i> Guardar & Reconectar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
