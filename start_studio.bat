@@ -7,5 +7,9 @@ echo ========================================================
 echo.
 echo Iniciando servidor en http://127.0.0.1:8585 ...
 start http://127.0.0.1:8585
-"C:\Users\enfoc\AppData\Local\Programs\Python\Python313\python.exe" -m uvicorn server:app --host 127.0.0.1 --port 8585
+if exist "%~dp0.venv\Scripts\python.exe" (
+    "%~dp0.venv\Scripts\python.exe" -m uvicorn server:app --host 127.0.0.1 --port 8585
+) else (
+    python -m uvicorn server:app --host 127.0.0.1 --port 8585
+)
 pause

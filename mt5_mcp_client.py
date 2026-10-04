@@ -12,15 +12,18 @@ class MT5MCPClient:
         self,
         terminal_url: str = "http://127.0.0.1:22346/mcp",
         terminal_token: str = "LeTcvxDiAkFhhSvwJv+GPUyUWhT82Dzy3XWsgdVh4a",
-        metaeditor_exe: str = r"C:\Users\enfoc\trading-bots\ma20_short_15min\MetaEditor64.exe"
+        metaeditor_exe: str = r"C:\Program Files\MetaTrader 5\MetaEditor64.exe"
     ):
         self.terminal_url = terminal_url
         self.terminal_token = terminal_token
         self.metaeditor_exe = metaeditor_exe
         
         self.session = requests.Session()
+        token = (self.terminal_token or "").strip()
+        if token.lower().startswith("bearer "):
+            token = token[7:].strip()
         self.session.headers.update({
-            "Authorization": f"Bearer {self.terminal_token}",
+            "Authorization": f"Bearer {token}",
             "Content-Type": "application/json"
         })
         self._request_id = 1
@@ -87,14 +90,30 @@ class MT5MCPClient:
             raise RuntimeError(f"MCP Tool '{name}' error: {data['error']}")
         return data.get("result", {})
 
+    def _find_default_mql5_root(self) -> str:
+        appdata = os.environ.get("APPDATA", "")
+        terminal_base = os.path.join(appdata, "MetaQuotes", "Terminal")
+        if os.path.exists(terminal_base):
+            entries = sorted(
+                [os.path.join(terminal_base, e) for e in os.listdir(terminal_base)],
+                key=lambda p: os.path.getmtime(p) if os.path.exists(p) else 0,
+                reverse=True
+            )
+            for folder in entries:
+                mql5_path = os.path.join(folder, "MQL5")
+                if os.path.isdir(mql5_path):
+                    return mql5_path
+        return os.path.join(os.path.dirname(__file__), "MQL5")
+
     def get_experts_folder(self) -> str:
         """Returns the Experts folder path in MQL5."""
         if not self.workspace_info:
             self.initialize()
-        mql5_root = self.workspace_info.get(
-            "mql5_folder",
-            r"C:\Users\enfoc\AppData\Roaming\MetaQuotes\Terminal\E4E3D6B0853619F6FFFB2291E6373BCC\MQL5"
-        )
+        mql5_root = ""
+        if self.workspace_info:
+            mql5_root = self.workspace_info.get("mql5_folder", "")
+        if not mql5_root:
+            mql5_root = self._find_default_mql5_root()
         # We use CodexResearch subfolder as it's already cataloged by the running terminal
         target_dir = os.path.join(mql5_root, "Experts", "CodexResearch")
         os.makedirs(target_dir, exist_ok=True)
@@ -102,10 +121,11 @@ class MT5MCPClient:
 
     def get_tester_folder(self) -> str:
         """Returns the Tester Profiles folder path."""
-        mql5_root = self.workspace_info.get(
-            "mql5_folder",
-            r"C:\Users\enfoc\AppData\Roaming\MetaQuotes\Terminal\E4E3D6B0853619F6FFFB2291E6373BCC\MQL5"
-        )
+        mql5_root = ""
+        if self.workspace_info:
+            mql5_root = self.workspace_info.get("mql5_folder", "")
+        if not mql5_root:
+            mql5_root = self._find_default_mql5_root()
         tester_dir = os.path.join(mql5_root, "Profiles", "Tester")
         os.makedirs(tester_dir, exist_ok=True)
         return tester_dir

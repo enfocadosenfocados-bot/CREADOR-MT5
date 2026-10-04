@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "metaeditor": {
+      "type": "http",
+      "url": "http://127.0.0.1:22345/mcp",
+      "headers": {
+        "Authorization": "Bearer 8lmSZVIHN1sEj9FuK1y7bwivvzsV7kQ2nunOOCTVWQ"
+      }
+    },
+    "terminal": {
+      "type": "http",
+      "url": "http://127.0.0.1:22346/mcp",
+      "headers": {
+        "Authorization": "Bearer 8lmSZVIHN1sEj9FuK1y7bwivvzsV7kQ2nunOOCTVWQ"
+      }
+    }
+  }
+}

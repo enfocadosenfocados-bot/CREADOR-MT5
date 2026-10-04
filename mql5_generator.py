@@ -13,7 +13,16 @@ class MQL5Generator:
         lot_size = strategy_spec.get("default_lot", 0.01)
         sl_points = strategy_spec.get("stop_loss_points", 300)
         tp_points = strategy_spec.get("take_profit_points", 600)
+        be_pips = strategy_spec.get("breakeven_pips", 15)
+        trailing_pips = strategy_spec.get("trailing_stop_pips", 12)
         magic_number = strategy_spec.get("magic_number", 789101)
+
+        start_hour = strategy_spec.get("start_hour", 13)
+        start_min = strategy_spec.get("start_minute", 30)
+        end_hour = strategy_spec.get("end_hour", 20)
+        end_min = strategy_spec.get("end_minute", 0)
+        use_time_filter = strategy_spec.get("use_time_filter", True)
+        max_spread = strategy_spec.get("max_spread_points", 35)
         
         indicators = strategy_spec.get("indicators", [])
         entry_buy_logic = strategy_spec.get("entry_buy_code", "false")
@@ -28,8 +37,21 @@ class MQL5Generator:
         inputs_code.append(f'input double InpLotSize        = {lot_size};       // Lot Size')
         inputs_code.append(f'input int    InpStopLossPips   = {sl_points // 10};       // Stop Loss (Pips)')
         inputs_code.append(f'input int    InpTakeProfitPips = {tp_points // 10};      // Take Profit (Pips)')
+        inputs_code.append(f'input int    InpBreakEvenPips  = {be_pips};       // Break-Even Trigger (Pips, 0=Off)')
+        inputs_code.append(f'input int    InpTrailingPips   = {trailing_pips};       // Trailing Stop (Pips, 0=Off)')
         inputs_code.append(f'input ulong  InpMagicNumber    = {magic_number};   // Magic Number')
         inputs_code.append(f'input int    InpSlippage       = 10;               // Slippage Points')
+
+        inputs_code.append(f'input group "=== Session and Operating Hours ==="')
+        inputs_code.append(f'input bool   InpUseTimeFilter  = {"true" if use_time_filter else "false"};       // Enable Trading Session Filter')
+        inputs_code.append(f'input int    InpStartHour      = {start_hour};       // Session Start Hour (Server Time)')
+        inputs_code.append(f'input int    InpStartMinute    = {start_min};       // Session Start Minute')
+        inputs_code.append(f'input int    InpEndHour        = {end_hour};       // Session End Hour')
+        inputs_code.append(f'input int    InpEndMinute      = {end_min};       // Session End Minute')
+        inputs_code.append(f'input bool   InpFilterFriday   = true;       // Avoid Friday Late Afternoon Trading')
+
+        inputs_code.append(f'input group "=== Spread and Safety Filter ==="')
+        inputs_code.append(f'input int    InpMaxSpreadPoints= {max_spread};       // Max Allowed Spread (Points, 0=Off)')
         
         if custom_inputs:
             inputs_code.append(f'input group "=== Strategy Parameters ==="')
@@ -114,6 +136,40 @@ void OnDeinit(const int reason)
 }}
 
 //+------------------------------------------------------------------+
+//| Checks whether current time is within trading session            |
+//+------------------------------------------------------------------+
+bool IsWithinTradingHours()
+{{
+   if(!InpUseTimeFilter) return true;
+   MqlDateTime dt;
+   TimeToStruct(TimeCurrent(), dt);
+   
+   // Weekend filter
+   if(dt.day_of_week == 0 || dt.day_of_week == 6) return false;
+   // Friday close filter
+   if(InpFilterFriday && dt.day_of_week == 5 && dt.hour >= 20) return false;
+
+   int cur_min   = dt.hour * 60 + dt.min;
+   int start_min = InpStartHour * 60 + InpStartMinute;
+   int end_min   = InpEndHour * 60 + InpEndMinute;
+
+   if(start_min <= end_min)
+      return (cur_min >= start_min && cur_min <= end_min);
+   else
+      return (cur_min >= start_min || cur_min <= end_min);
+}}
+
+//+------------------------------------------------------------------+
+//| Checks spread against maximum allowed threshold                  |
+//+------------------------------------------------------------------+
+bool IsSpreadAllowed()
+{{
+   if(InpMaxSpreadPoints <= 0) return true;
+   long spread = SymbolInfoInteger(_Symbol, SYMBOL_SPREAD);
+   return (spread <= InpMaxSpreadPoints);
+}}
+
+//+------------------------------------------------------------------+
 //| Checks whether a new bar has just opened                         |
 //+------------------------------------------------------------------+
 bool IsNewBar()
@@ -126,6 +182,74 @@ bool IsNewBar()
       return true;
    }}
    return false;
+}}
+
+//+------------------------------------------------------------------+
+//| Real-time Break-Even and Trailing Stop Manager                   |
+//+------------------------------------------------------------------+
+void CheckBreakEvenAndTrailing(double pip_size, int digits)
+{{
+   if(InpBreakEvenPips <= 0 && InpTrailingPips <= 0) return;
+
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   {{
+      if(m_position.SelectByIndex(i))
+      {{
+         if(m_position.Symbol() == _Symbol && m_position.Magic() == InpMagicNumber)
+         {{
+            double open_price = m_position.PriceOpen();
+            double current_sl = m_position.StopLoss();
+            double current_tp = m_position.TakeProfit();
+
+            // BUY POSITION
+            if(m_position.PositionType() == POSITION_TYPE_BUY)
+            {{
+               double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+               // Break-even: Move SL to entry
+               if(InpBreakEvenPips > 0 && (bid - open_price) >= (InpBreakEvenPips * pip_size))
+               {{
+                  if(current_sl < open_price)
+                  {{
+                     m_trade.PositionModify(m_position.Ticket(), NormalizeDouble(open_price, digits), current_tp);
+                     current_sl = open_price;
+                  }}
+               }}
+               // Trailing stop
+               if(InpTrailingPips > 0 && (bid - open_price) > (InpTrailingPips * pip_size))
+               {{
+                  double new_sl = NormalizeDouble(bid - (InpTrailingPips * pip_size), digits);
+                  if(new_sl > current_sl)
+                  {{
+                     m_trade.PositionModify(m_position.Ticket(), new_sl, current_tp);
+                  }}
+               }}
+            }}
+            // SELL POSITION
+            else if(m_position.PositionType() == POSITION_TYPE_SELL)
+            {{
+               double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+               // Break-even: Move SL to entry
+               if(InpBreakEvenPips > 0 && (open_price - ask) >= (InpBreakEvenPips * pip_size))
+               {{
+                  if(current_sl == 0 || current_sl > open_price)
+                  {{
+                     m_trade.PositionModify(m_position.Ticket(), NormalizeDouble(open_price, digits), current_tp);
+                     current_sl = open_price;
+                  }}
+               }}
+               // Trailing stop
+               if(InpTrailingPips > 0 && (open_price - ask) > (InpTrailingPips * pip_size))
+               {{
+                  double new_sl = NormalizeDouble(ask + (InpTrailingPips * pip_size), digits);
+                  if(current_sl == 0 || new_sl < current_sl)
+                  {{
+                     m_trade.PositionModify(m_position.Ticket(), new_sl, current_tp);
+                  }}
+               }}
+            }}
+         }}
+      }}
+   }}
 }}
 
 //+------------------------------------------------------------------+
@@ -171,7 +295,18 @@ void ClosePositions(ENUM_POSITION_TYPE type)
 //+------------------------------------------------------------------+
 void OnTick()
 {{
-   // Execute only on new candle open
+   int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
+   double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+   double pip_size = (digits == 3 || digits == 5) ? point * 10 : point;
+
+   // 1. Monitoreo en tiempo real de Break-Even y Trailing Stop
+   CheckBreakEvenAndTrailing(pip_size, digits);
+
+   // 2. Filtro de Horarios de Sesion y Filtro de Spread
+   if(!IsWithinTradingHours()) return;
+   if(!IsSpreadAllowed()) return;
+
+   // 3. Ejecucion de nuevas entradas solo en apertura de nueva vela
    if(!IsNewBar()) return;
 
    // Update indicator buffer data
@@ -184,10 +319,6 @@ void OnTick()
 
    double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
    double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-   int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
-   double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
-
-   double pip_size = (digits == 3 || digits == 5) ? point * 10 : point;
 
    // --- Evaluate Signals ---
    bool signal_buy  = ({entry_buy_logic});

@@ -85,14 +85,17 @@
       <button onclick="switchTab('tab-radar')" id="btn-tab-radar" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
         <i class="fa-solid fa-radar text-sky-400"></i> 2. Radar & Scraping Global
       </button>
+      <button onclick="switchTab('tab-audit')" id="btn-tab-audit" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
+        <i class="fa-solid fa-clipboard-check text-amber-400"></i> 3. Auditoría & Extracción
+      </button>
       <button onclick="switchTab('tab-mql5')" id="btn-tab-mql5" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
-        <i class="fa-solid fa-code"></i> 3. Estrategia & MQL5
+        <i class="fa-solid fa-code text-emerald-400"></i> 4. Estrategia & MQL5
       </button>
       <button onclick="switchTab('tab-backtest')" id="btn-tab-backtest" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
-        <i class="fa-solid fa-flask"></i> 4. Backtest en MT5
+        <i class="fa-solid fa-flask text-teal-400"></i> 5. Backtest en MT5
       </button>
       <button onclick="switchTab('tab-results')" id="btn-tab-results" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
-        <i class="fa-solid fa-square-poll-vertical"></i> 5. Métricas & Veredicto
+        <i class="fa-solid fa-square-poll-vertical text-purple-400"></i> 6. Métricas & Veredicto
       </button>
     </nav>
   </div>
@@ -254,7 +257,243 @@
       </div>
     </section>
 
-    <!-- TAB 3: ESTRATEGIA & MQL5 CODE -->
+    <!-- TAB 3: AUDITORÍA & EXTRACCIÓN DE REGLAS DEL VIDEO -->
+    <section id="tab-audit" class="tab-pane space-y-6 hidden">
+      <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-6">
+        
+        <!-- Header Banner -->
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+          <div>
+            <div class="flex items-center gap-2 mb-2">
+              <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1.5">
+                <i class="fa-solid fa-microchip"></i> Paso 3: Auditoría &amp; Extracción Exhaustiva
+              </span>
+              <span class="px-2.5 py-1 rounded-full text-[11px] font-mono bg-slate-800 text-slate-300 border border-slate-700" id="auditTraderBadge">
+                Trader Detectado
+              </span>
+            </div>
+            <h2 class="text-xl font-bold text-white tracking-tight" id="auditTitle">
+              Esperando extracción de estrategia...
+            </h2>
+            <p class="text-xs text-slate-400 mt-1.5 leading-relaxed max-w-4xl" id="auditSummary">
+              Aquí se desglosan en texto detallado todos los indicadores, temporalidades, horarios de sesión, gestión de riesgo y reglas que el trader enseñó en el video antes de generar el código MQL5.
+            </p>
+          </div>
+
+          <div class="flex-shrink-0">
+            <button onclick="proceedToMql5Generation()" id="btnProceedMql5" class="px-6 py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 hover:from-emerald-500 hover:to-sky-500 text-white font-bold text-sm flex items-center gap-2.5 shadow-xl shadow-emerald-600/25 transition transform hover:scale-[1.02]">
+              <span>⚡ Paso 4: Generar EA en MQL5 con estas Reglas</span>
+              <i class="fa-solid fa-arrow-right"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Section 1: Horarios de Operativa & Activos a Operar (2 Cards Grid) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          <!-- Card: Horarios de Operativa & Sesiones -->
+          <div class="bg-slate-950 p-5 rounded-xl border border-slate-800/80 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-business-time text-amber-400"></i> Horarios de Operativa &amp; Sesiones de Trading
+              </h3>
+              <span class="text-[11px] font-mono text-amber-400 font-semibold" id="auditSessionName">New York Session</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div class="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                <span class="text-[11px] font-semibold text-slate-400 block mb-1">⏰ Ventana Horaria</span>
+                <div class="text-xs text-white font-mono font-bold" id="auditOperatingWindow">13:30 - 20:00 UTC (09:30 - 16:00 EST)</div>
+              </div>
+
+              <div class="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                <span class="text-[11px] font-semibold text-slate-400 block mb-1">📅 Días Operativos</span>
+                <div class="text-xs text-emerald-400 font-mono" id="auditSessionDays">Lunes a Viernes</div>
+              </div>
+            </div>
+
+            <div class="bg-slate-900/70 p-3 rounded-lg border border-slate-800 text-[11px] text-slate-300 leading-relaxed font-sans">
+              <strong class="text-slate-400 block mb-0.5">📌 Notas de Sesión y Volatilidad:</strong>
+              <span id="auditSessionNotes">Máxima liquidez durante apertura. Filtro activo para evitar viernes por la tarde.</span>
+            </div>
+          </div>
+
+          <!-- Card: Activos & Especificación del Mercado -->
+          <div class="bg-slate-950 p-5 rounded-xl border border-slate-800/80 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-coins text-emerald-400"></i> Activos a Operar &amp; Marco de Mercado
+              </h3>
+              <span class="text-[11px] font-mono text-emerald-400" id="auditAssetClass">Índices &amp; Forex</span>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div class="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                <span class="text-[11px] font-semibold text-slate-400 block mb-1">🎯 Activos</span>
+                <div class="text-xs text-white font-mono font-bold" id="auditSymbols">EURUSD, NAS100</div>
+              </div>
+
+              <div class="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                <span class="text-[11px] font-semibold text-slate-400 block mb-1">⏱️ Timeframe</span>
+                <div class="text-xs text-sky-400 font-mono font-bold" id="auditTimeframe">M3</div>
+              </div>
+
+              <div class="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                <span class="text-[11px] font-semibold text-slate-400 block mb-1">⚡ Spread Máximo</span>
+                <div class="text-xs text-amber-400 font-mono" id="auditMaxSpread">35 pts (3.5 pips)</div>
+              </div>
+            </div>
+
+            <div class="bg-slate-900/70 p-3 rounded-lg border border-slate-800 text-[11px] text-slate-300 leading-relaxed font-sans">
+              <strong class="text-slate-400 block mb-0.5">🏦 Recomendación de Cuenta:</strong>
+              <span id="auditAccountType">Cuentas ECN / RAW Spread con baja latencia y comisión reducida.</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Section 2: Indicadores & Salsa Secreta (Left) vs Reglas de Entrada & Gestión de Riesgo (Right) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          <!-- Left Column: Indicadores & Consejos Clave -->
+          <div class="space-y-6">
+            
+            <!-- Card: Indicadores Usados (Específicos o Custom) -->
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800/80 space-y-4">
+              <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                  <i class="fa-solid fa-chart-simple text-sky-400"></i> Indicadores Específicos de la Estrategia
+                </h3>
+                <span class="text-[11px] text-slate-500 font-mono">Nativos MT5 &amp; Custom</span>
+              </div>
+              
+              <div id="auditIndicatorsList" class="space-y-3">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+
+            <!-- Card: Salsa Secreta & Consejos del Trader -->
+            <div class="bg-slate-950 p-5 rounded-xl border border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-transparent space-y-3">
+              <h3 class="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-2">
+                <i class="fa-solid fa-key text-amber-400"></i> Salsa Secreta &amp; Trampas Reveladas en el Video
+              </h3>
+              <p class="text-xs text-slate-300 leading-relaxed font-sans whitespace-pre-line" id="auditSecrets">
+                -
+              </p>
+            </div>
+
+          </div>
+
+          <!-- Right Column: Reglas de Entrada, Gatillos, SL, TP, Trailing & BreakEven -->
+          <div class="space-y-6">
+
+            <!-- Card: Reglas de Entrada (Long & Short & Gatillo) -->
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800/80 space-y-4">
+              <div class="border-b border-slate-800 pb-3">
+                <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                  <i class="fa-solid fa-crosshairs text-emerald-400"></i> Reglas de Entrada Completas &amp; Gatillos
+                </h3>
+              </div>
+
+              <!-- Contexto de mercado -->
+              <div class="bg-slate-900/70 p-3 rounded-lg border border-slate-800 text-xs text-slate-300 space-y-1">
+                <span class="text-slate-400 font-semibold block text-[11px]">🌐 Contexto de Mercado / Estructura Previa:</span>
+                <span id="auditMarketContext" class="leading-relaxed">-</span>
+              </div>
+
+              <!-- Regla Compra -->
+              <div class="space-y-1.5">
+                <div class="flex items-center gap-2 text-xs font-bold text-emerald-400">
+                  <i class="fa-solid fa-circle-arrow-up"></i> Condición para COMPRA (Long)
+                </div>
+                <div class="bg-slate-900/90 p-3 rounded-lg border border-emerald-500/20 text-xs text-slate-200 font-sans leading-relaxed whitespace-pre-line" id="auditRuleLong">
+                  -
+                </div>
+              </div>
+
+              <!-- Regla Venta -->
+              <div class="space-y-1.5">
+                <div class="flex items-center gap-2 text-xs font-bold text-rose-400">
+                  <i class="fa-solid fa-circle-arrow-down"></i> Condición para VENTA (Short)
+                </div>
+                <div class="bg-slate-900/90 p-3 rounded-lg border border-rose-500/20 text-xs text-slate-200 font-sans leading-relaxed whitespace-pre-line" id="auditRuleShort">
+                  -
+                </div>
+              </div>
+
+              <!-- Gatillo & Confirmación de Velas -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-800 text-[11px] text-slate-400 space-y-1">
+                  <strong class="text-sky-400 block"><i class="fa-solid fa-bolt"></i> Gatillo (Trigger):</strong>
+                  <span id="auditTrigger">-</span>
+                </div>
+                <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-800 text-[11px] text-slate-400 space-y-1">
+                  <strong class="text-amber-400 block"><i class="fa-solid fa-check-double"></i> Confirmación:</strong>
+                  <span id="auditConfirmation">-</span>
+                </div>
+              </div>
+
+              <!-- Regla de Invalidación -->
+              <div class="bg-slate-900/60 p-3 rounded-lg border border-rose-500/20 text-[11px] text-slate-300 flex items-start gap-2">
+                <i class="fa-solid fa-ban text-rose-400 mt-0.5"></i>
+                <div>
+                  <strong class="text-rose-400 block text-[11px]">Regla de Invalidación (Cuándo NO operar):</strong>
+                  <span id="auditInvalidation">-</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card: Gestión de Riesgo (SL, TP, BE, Trailing, Lotes) -->
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800/80 space-y-4">
+              <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                  <i class="fa-solid fa-shield-halved text-sky-400"></i> Gestión de Riesgo &amp; Salidas Institucionales
+                </h3>
+                <span class="text-[11px] font-mono text-emerald-400 font-semibold" id="auditRR">Ratio 1:3</span>
+              </div>
+
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                  <span class="text-[11px] font-semibold text-slate-400 block mb-1">🛑 Stop Loss</span>
+                  <div class="text-xs text-white font-mono" id="auditSL">20 pips</div>
+                </div>
+
+                <div class="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                  <span class="text-[11px] font-semibold text-slate-400 block mb-1">🎯 Take Profit</span>
+                  <div class="text-xs text-white font-mono" id="auditTP">60 pips</div>
+                </div>
+
+                <div class="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                  <span class="text-[11px] font-semibold text-slate-400 block mb-1">🔒 Break-Even</span>
+                  <div class="text-xs text-emerald-400 font-mono" id="auditBE">+15 pips</div>
+                </div>
+
+                <div class="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                  <span class="text-[11px] font-semibold text-slate-400 block mb-1">📈 Trailing Stop</span>
+                  <div class="text-xs text-sky-400 font-mono" id="auditTrailing">12 pips</div>
+                </div>
+              </div>
+
+              <div class="bg-slate-900/70 p-3 rounded-lg border border-slate-800 text-[11px] text-slate-300 flex items-center justify-between">
+                <div>
+                  <span class="text-slate-400 block font-semibold">📏 Dimensionamiento de Posición:</span>
+                  <span id="auditLotSizing">0.01 lotes por cada $1,000 de capital o 1% de riesgo.</span>
+                </div>
+                <div class="text-right">
+                  <span class="text-slate-400 block font-semibold">Protección de Cuenta:</span>
+                  <span class="text-emerald-400 font-mono">Break-Even a Riesgo Cero</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 4: ESTRATEGIA & MQL5 CODE -->
     <section id="tab-mql5" class="tab-pane space-y-6 hidden">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         

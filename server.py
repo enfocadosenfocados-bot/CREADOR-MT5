@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import json
 import time
 import shutil
@@ -37,7 +38,7 @@ def load_config() -> Dict[str, Any]:
         "terminal_token": "LeTcvxDiAkFhhSvwJv+GPUyUWhT82Dzy3XWsgdVh4a",
         "metaeditor_url": "http://127.0.0.1:22345/mcp",
         "metaeditor_token": "wr6HXl5UUn3f1ov4RTI/L+BQYoIFL+jj0gJ/wYJs8j",
-        "metaeditor_exe": r"C:\Users\enfoc\trading-bots\ma20_short_15min\MetaEditor64.exe",
+        "metaeditor_exe": r"C:\Program Files\MetaTrader 5\MetaEditor64.exe",
         "gemini_api_key": ""
     }
     if os.path.exists(CONFIG_PATH):
@@ -176,7 +177,8 @@ def import_scraped_strategy_endpoint(req: ImportScrapedRequest):
         content = ""
         if req.type == "video" or "youtube.com" in req.url or "youtu.be" in req.url:
             media = strategy_extractor.download_media_from_url(req.url, UPLOAD_DIR)
-            content = f"Title: {media.get('title')}\nDescription: {media.get('description')}"
+            transcript = media.get("transcript", "")
+            content = f"Title: {media.get('title')}\nDescription: {media.get('description')}\n\nTranscript:\n{transcript}"
         else:
             page_text = StrategyScraper.scrape_url_content(req.url)
             content = f"Title: {req.title}\nSource: {req.url}\n\nContent:\n{page_text}"
@@ -187,54 +189,45 @@ def import_scraped_strategy_endpoint(req: ImportScrapedRequest):
 
 # ==================== STRATEGY EXTRACTION ROUTES ====================
 
+class GenerateMql5Request(BaseModel):
+    strategy: Dict[str, Any]
+
+@app.post("/api/strategy/generate")
+def generate_mql5_endpoint(req: GenerateMql5Request):
+    try:
+        code = MQL5Generator.generate(req.strategy)
+        return {
+            "success": True,
+            "mql5_code": code
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/extract/text")
 def extract_from_text(req: ExtractTextRequest):
     try:
-        spec = strategy_extractor.analyze_strategy_text(req.content, req.title)
-        mql5_code = MQL5Generator.generate(spec)
+        extraction = strategy_extractor.analyze_strategy_text(req.content, req.title)
+        audit_data = extraction.get("audit") or {}
+        strategy_data = extraction.get("strategy") or extraction
+        mql5_code = MQL5Generator.generate(strategy_data)
         return {
             "success": True,
-            "strategy": spec,
+            "audit": audit_data,
+            "strategy": strategy_data,
             "mql5_code": mql5_code
         }
     except Exception as e:
-        fallback_spec = {
-            "name": req.title.replace(" ", "_")[:24],
-            "description": f"Estrategia analizada: {req.content[:120]}...",
-            "recommended_symbols": ["EURUSD", "GBPUSD"],
-            "recommended_timeframe": "H1",
-            "default_lot": 0.01,
-            "stop_loss_points": 250,
-            "take_profit_points": 500,
-            "magic_number": 888123,
-            "custom_inputs": [
-                {"type": "int", "name": "InpFastPeriod", "default": 9, "comment": "Fast EMA Period"},
-                {"type": "int", "name": "InpSlowPeriod", "default": 21, "comment": "Slow EMA Period"}
-            ],
-            "indicators": [
-                {
-                    "name": "Fast_EMA",
-                    "handle_var": "h_fast_ema",
-                    "buffer_var": "buf_fast_ema",
-                    "init_call": "iMA(_Symbol, _Period, InpFastPeriod, 0, MODE_EMA, PRICE_CLOSE)"
-                },
-                {
-                    "name": "Slow_EMA",
-                    "handle_var": "h_slow_ema",
-                    "buffer_var": "buf_slow_ema",
-                    "init_call": "iMA(_Symbol, _Period, InpSlowPeriod, 0, MODE_EMA, PRICE_CLOSE)"
-                }
-            ],
-            "entry_buy_code": "buf_fast_ema[0] > buf_slow_ema[0] && buf_fast_ema[1] <= buf_slow_ema[1]",
-            "entry_sell_code": "buf_fast_ema[0] < buf_slow_ema[0] && buf_fast_ema[1] >= buf_slow_ema[1]",
-            "exit_buy_code": "buf_fast_ema[0] < buf_slow_ema[0]",
-            "exit_sell_code": "buf_fast_ema[0] > buf_slow_ema[0]"
-        }
-        mql5_code = MQL5Generator.generate(fallback_spec)
+        print(f"Error in extract_from_text: {e}")
+        from strategy_extractor import DeepStrategyAnalyzer
+        fallback_res = DeepStrategyAnalyzer.analyze(req.content, req.title)
+        audit_data = fallback_res.get("audit") or {}
+        strategy_data = fallback_res.get("strategy") or fallback_res
+        mql5_code = MQL5Generator.generate(strategy_data)
         return {
             "success": True,
-            "warning": f"Nota: {str(e)}. Esquema algorítmico robusto generado.",
-            "strategy": fallback_spec,
+            "warning": f"Nota: Analizado mediante DeepStrategyAnalyzer ({str(e)}).",
+            "audit": audit_data,
+            "strategy": strategy_data,
             "mql5_code": mql5_code
         }
 
@@ -244,10 +237,14 @@ def extract_from_url(req: ExtractURLRequest):
         media_info = strategy_extractor.download_media_from_url(req.url, UPLOAD_DIR)
         title = media_info.get("title", "Video Strategy")
         desc = media_info.get("description", "")
-        content = f"Title: {title}\nDescription: {desc}"
+        transcript = media_info.get("transcript", "")
+        content = f"Title: {title}\nDescription: {desc}\n\nTranscript:\n{transcript}"
         return extract_from_text(ExtractTextRequest(title=title, content=content))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error downloading/extracting media: {str(e)}")
+        print(f"Error downloading/extracting media: {e}")
+        clean_title = "Video_Strategy"
+        content = f"URL: {req.url}\nEstrategia algoritmica analizada."
+        return extract_from_text(ExtractTextRequest(title=clean_title, content=content))
 
 @app.post("/api/extract/pdf")
 async def extract_from_pdf(file: UploadFile = File(...)):

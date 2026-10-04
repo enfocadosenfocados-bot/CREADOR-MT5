@@ -1,5 +1,6 @@
 // State variables
 let currentStrategy = null;
+let currentAudit = null;
 let currentMql5Code = "";
 let currentRunId = null;
 let equityChart = null;
@@ -227,6 +228,9 @@ async function importScrapedItem(encodedUrl, encodedTitle, type) {
       body: JSON.stringify({ url: url, title: title, type: type })
     });
     const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || data.error || data.message || "Error al importar estrategia");
+    }
     handleExtractionSuccess(data);
   } catch (err) {
     alert("Error al importar estrategia: " + err.message);
@@ -268,6 +272,9 @@ async function processText() {
       body: JSON.stringify({ title: "Estrategia Extraída", content: content })
     });
     const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || data.error || data.message || "Error del servidor al analizar texto");
+    }
     handleExtractionSuccess(data);
   } catch (e) {
     alert("Error al extraer estrategia: " + e.message);
@@ -288,6 +295,9 @@ async function processUrl() {
       body: JSON.stringify({ url: url })
     });
     const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || data.error || data.message || "Error del servidor al procesar la URL");
+    }
     handleExtractionSuccess(data);
   } catch (e) {
     alert("Error procesando URL: " + e.message);
@@ -313,6 +323,9 @@ async function handlePdfUpload(event) {
       body: formData
     });
     const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || data.error || data.message || "Error del servidor al procesar el PDF");
+    }
     handleExtractionSuccess(data);
   } catch (e) {
     alert("Error procesando PDF: " + e.message);
@@ -322,25 +335,158 @@ async function handlePdfUpload(event) {
 }
 
 function handleExtractionSuccess(data) {
+  if (!data || !data.strategy) {
+    alert("No se pudo obtener la estrategia: " + (data && (data.detail || data.error || data.message) || "Respuesta incompleta"));
+    return;
+  }
   currentStrategy = data.strategy;
-  currentMql5Code = data.mql5_code;
+  currentMql5Code = data.mql5_code || "";
+  currentAudit = data.audit || {};
 
+  // Actualizar previsualización en pestaña 1
   document.getElementById("prevName").innerText = currentStrategy.name || "Estrategia IA";
   const syms = (currentStrategy.recommended_symbols || ["EURUSD"]).join(", ");
   const tf = currentStrategy.recommended_timeframe || "H1";
   document.getElementById("prevTf").innerText = `${syms} (${tf})`;
-  
   const inds = (currentStrategy.indicators || []).map(i => i.name).join(", ");
   document.getElementById("prevIndicators").innerText = inds || "EMAs / RSI";
 
-  document.getElementById("mqlName").value = currentStrategy.name || "AI_Strategy";
-  document.getElementById("logicBuy").innerText = currentStrategy.entry_buy_code || "Sin código";
-  document.getElementById("logicSell").innerText = currentStrategy.entry_sell_code || "Sin código";
-  document.getElementById("logicSL").innerText = (currentStrategy.stop_loss_points ? (currentStrategy.stop_loss_points / 10) : 25) + " pips";
-  document.getElementById("logicTP").innerText = (currentStrategy.take_profit_points ? (currentStrategy.take_profit_points / 10) : 50) + " pips";
-  document.getElementById("mqlCodeEditor").value = currentMql5Code;
+  // Rellenar pestaña 3: Auditoría & Extracción Exhaustiva
+  renderAuditData(currentAudit, currentStrategy);
 
-  switchTab("tab-mql5");
+  // Cambiar al Paso 3: Auditoría & Extracción de Reglas
+  switchTab("tab-audit");
+}
+
+function renderAuditData(audit, strategy) {
+  document.getElementById("auditTitle").innerText = audit.title || strategy.name || "Estrategia Extraída";
+  document.getElementById("auditTraderBadge").innerText = audit.trader || "Trader Profesional";
+  document.getElementById("auditSummary").innerText = audit.summary || strategy.description || "Análisis de estrategia institucional.";
+  document.getElementById("auditTimeframe").innerText = audit.timeframe || (strategy.recommended_timeframe || "M15");
+  document.getElementById("auditSymbols").innerText = (audit.symbols || strategy.recommended_symbols || ["EURUSD"]).join(", ");
+
+  // Horarios de Operativa & Sesiones
+  const th = audit.trading_hours || {};
+  if (document.getElementById("auditSessionName")) {
+    document.getElementById("auditSessionName").innerText = th.session_name || "New York / London";
+  }
+  if (document.getElementById("auditOperatingWindow")) {
+    document.getElementById("auditOperatingWindow").innerText = th.operating_window || "13:30 - 20:00 UTC";
+  }
+  if (document.getElementById("auditSessionDays")) {
+    document.getElementById("auditSessionDays").innerText = th.days || "Lunes a Viernes";
+  }
+  if (document.getElementById("auditSessionNotes")) {
+    document.getElementById("auditSessionNotes").innerText = th.notes || "Operar en momentos de alta liquidez y volumen institucional.";
+  }
+
+  // Activos & Especificación del Mercado
+  const mas = audit.market_asset_spec || {};
+  if (document.getElementById("auditAssetClass")) {
+    document.getElementById("auditAssetClass").innerText = mas.asset_class || "Forex / Índices";
+  }
+  if (document.getElementById("auditMaxSpread")) {
+    document.getElementById("auditMaxSpread").innerText = mas.max_spread || ((strategy.max_spread_points || 35) + " pts");
+  }
+  if (document.getElementById("auditAccountType")) {
+    document.getElementById("auditAccountType").innerText = mas.account_recommendation || "Cuentas ECN / RAW Spread con baja latencia.";
+  }
+
+  // Renderizar lista de indicadores específicos
+  const indList = document.getElementById("auditIndicatorsList");
+  indList.innerHTML = "";
+  const indicators = audit.indicators || [];
+  if (indicators.length === 0 && strategy.indicators) {
+    strategy.indicators.forEach(ind => {
+      indicators.push({
+        name: ind.name,
+        category: "Nativo MT5",
+        parameters: ind.init_call,
+        description: "Indicador incorporado en la lógica algorítmica."
+      });
+    });
+  }
+
+  indicators.forEach(ind => {
+    const isCustom = ind.is_custom || (ind.category && ind.category.toLowerCase().includes("custom"));
+    const badgeClass = isCustom ? "bg-purple-500/20 text-purple-300 border-purple-500/30" : "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+    const badgeText = isCustom ? "Custom / Order Flow" : "Nativo MT5";
+    const card = document.createElement("div");
+    card.className = "p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-1.5";
+    card.innerHTML = `
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-chart-line text-sky-400"></i> ${ind.name}
+        </span>
+        <span class="text-[10px] px-2 py-0.5 rounded-full border font-mono ${badgeClass}">${badgeText}</span>
+      </div>
+      <div class="text-[11px] text-slate-400 font-mono"><strong class="text-slate-300">Parámetros:</strong> ${ind.parameters || "N/A"}</div>
+      <div class="text-[11px] text-slate-300 leading-relaxed font-sans">${ind.description || ""}</div>
+    `;
+    indList.appendChild(card);
+  });
+
+  // Renderizar Reglas de Entrada, Gatillos & Invalidación
+  const rules = audit.entry_rules || {};
+  if (document.getElementById("auditMarketContext")) {
+    document.getElementById("auditMarketContext").innerText = rules.market_context || "Contexto de estructura y liquidez institucional.";
+  }
+  document.getElementById("auditRuleLong").innerText = rules.long || strategy.entry_buy_code || "Sin condición";
+  document.getElementById("auditRuleShort").innerText = rules.short || strategy.entry_sell_code || "Sin condición";
+  if (document.getElementById("auditTrigger")) {
+    document.getElementById("auditTrigger").innerText = rules.trigger || "Apertura de vela siguiente al confirmarse el setup.";
+  }
+  document.getElementById("auditConfirmation").innerText = rules.confirmation || "Esperar confirmación por cierre de vela.";
+  if (document.getElementById("auditInvalidation")) {
+    document.getElementById("auditInvalidation").innerText = rules.invalidation || "Invalidar si el spread supera la tolerancia máxima o falla el cierre.";
+  }
+
+  // Renderizar Gestión de Riesgo & Lot Sizing
+  const rm = audit.risk_management || {};
+  document.getElementById("auditSL").innerText = rm.stop_loss || ((strategy.stop_loss_points ? strategy.stop_loss_points/10 : 20) + " pips");
+  document.getElementById("auditTP").innerText = rm.take_profit || ((strategy.take_profit_points ? strategy.take_profit_points/10 : 60) + " pips");
+  document.getElementById("auditBE").innerText = rm.breakeven || ("+" + (strategy.breakeven_pips || 15) + " pips");
+  document.getElementById("auditTrailing").innerText = rm.trailing_stop || ((strategy.trailing_stop_pips || 12) + " pips");
+  document.getElementById("auditRR").innerText = rm.risk_reward_ratio || "Ratio 1:3";
+  if (document.getElementById("auditLotSizing")) {
+    document.getElementById("auditLotSizing").innerText = rm.lot_sizing || "0.01 lotes por cada $1,000 o 1% de riesgo institucional.";
+  }
+  document.getElementById("auditSecrets").innerText = audit.secrets_and_traps || "Gestión disciplinada de riesgo y paciencia.";
+}
+
+async function proceedToMql5Generation() {
+  const btn = document.getElementById("btnProceedMql5");
+  btn.disabled = true;
+  btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Generando MQL5...`;
+
+  try {
+    if (!currentMql5Code && currentStrategy) {
+      const res = await fetch("/api/strategy/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ strategy: currentStrategy })
+      });
+      const data = await res.json();
+      if (data.success && data.mql5_code) {
+        currentMql5Code = data.mql5_code;
+      }
+    }
+
+    document.getElementById("mqlName").value = currentStrategy?.name || "AI_Strategy";
+    document.getElementById("mqlCodeEditor").value = currentMql5Code || "";
+    document.getElementById("logicBuy").innerText = currentStrategy?.entry_buy_code || "Sin código";
+    document.getElementById("logicSell").innerText = currentStrategy?.entry_sell_code || "Sin código";
+    document.getElementById("logicSL").innerText = (currentStrategy?.stop_loss_points ? (currentStrategy.stop_loss_points / 10) : 25) + " pips";
+    document.getElementById("logicTP").innerText = (currentStrategy?.take_profit_points ? (currentStrategy.take_profit_points / 10) : 50) + " pips";
+
+    // Pasar al Paso 4: Código MQL5 & Compilación
+    switchTab("tab-mql5");
+  } catch (err) {
+    alert("Error generando MQL5: " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<span>⚡ Paso 4: Generar EA en MQL5 con estas Reglas</span> <i class="fa-solid fa-arrow-right"></i>`;
+  }
 }
 
 function showLoading(show, message = "") {

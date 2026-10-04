@@ -1,6 +1,6 @@
 import sys
 import os
-sys.path.append(r"C:\Users\enfoc\.gemini\antigravity\scratch\trading_strategy_studio")
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from mt5_mcp_client import MT5MCPClient
 from mql5_generator import MQL5Generator
