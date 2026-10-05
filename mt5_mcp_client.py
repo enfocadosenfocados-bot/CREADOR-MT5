@@ -73,7 +73,8 @@ class MT5MCPClient:
     def call_tool(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a tool call via MCP."""
         if not self._initialized:
-            self.initialize()
+            if not self.initialize():
+                return {"error": "MCP Terminal initialization failed"}
             
         payload = {
             "jsonrpc": "2.0",
@@ -84,11 +85,16 @@ class MT5MCPClient:
                 "arguments": arguments
             }
         }
-        res = self.session.post(self.terminal_url, json=payload, timeout=60)
-        data = res.json()
-        if "error" in data:
-            raise RuntimeError(f"MCP Tool '{name}' error: {data['error']}")
-        return data.get("result", {})
+        try:
+            res = self.session.post(self.terminal_url, json=payload, timeout=60)
+            if res.status_code != 200:
+                return {"error": f"HTTP {res.status_code}: {res.text[:200]}"}
+            data = res.json()
+            if "error" in data:
+                return {"error": f"MCP Tool '{name}' error: {data['error']}"}
+            return data.get("result", {})
+        except Exception as e:
+            return {"error": f"call_tool '{name}' exception: {str(e)}"}
 
     def _find_default_mql5_root(self) -> str:
         appdata = os.environ.get("APPDATA", "")
@@ -276,3 +282,13 @@ ForwardMode=0
             return ["EURUSD", "GBPUSD", "USDJPY", "BTCUSD", "US30"]
         data = json.loads(res["content"][0]["text"])
         return [s["symbol"] for s in data.get("symbols", [])]
+
+    def get_time_info(self) -> Dict[str, Any]:
+        """Fetches trade server and local time information from MT5 MCP."""
+        try:
+            res = self.call_tool("get_time_information", {})
+            if not res.get("isError") and res.get("content"):
+                return json.loads(res["content"][0]["text"])
+        except Exception as e:
+            print(f"Notice: Failed to fetch MT5 time information: {e}")
+        return {}

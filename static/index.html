@@ -67,6 +67,10 @@
         <div class="text-xs text-slate-300 font-mono" id="accountSummary">
           Cargando cuenta...
         </div>
+        <div class="h-4 w-px bg-slate-700"></div>
+        <div class="text-xs text-amber-400 font-mono flex items-center gap-1.5" id="serverTimeSummary">
+          <i class="fa-regular fa-clock"></i> <span id="serverTimeText">Servidor MT5: 01:54 AM (GMT+3)</span>
+        </div>
       </div>
 
       <!-- Config / MCP Switch Button -->
@@ -90,12 +94,6 @@
       </button>
       <button onclick="switchTab('tab-mql5')" id="btn-tab-mql5" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
         <i class="fa-solid fa-code text-emerald-400"></i> 4. Estrategia & MQL5
-      </button>
-      <button onclick="switchTab('tab-backtest')" id="btn-tab-backtest" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
-        <i class="fa-solid fa-flask text-teal-400"></i> 5. Backtest en MT5
-      </button>
-      <button onclick="switchTab('tab-results')" id="btn-tab-results" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 whitespace-nowrap">
-        <i class="fa-solid fa-square-poll-vertical text-purple-400"></i> 6. Métricas & Veredicto
       </button>
     </nav>
   </div>
@@ -497,11 +495,16 @@
     <section id="tab-mql5" class="tab-pane space-y-6 hidden">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <!-- Left: Strategy Breakdown -->
+        <!-- Left: Strategy Breakdown (Sincronizado con Auditoría) -->
         <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
-          <h3 class="text-base font-semibold text-white flex items-center gap-2">
-            <i class="fa-solid fa-list-check text-emerald-400"></i> Reglas de la Estrategia
-          </h3>
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-semibold text-white flex items-center gap-2">
+              <i class="fa-solid fa-list-check text-emerald-400"></i> Parámetros Sincronizados
+            </h3>
+            <button onclick="switchTab('tab-audit')" class="text-[11px] text-sky-400 hover:text-sky-300 flex items-center gap-1 font-mono">
+              <i class="fa-solid fa-arrow-left"></i> Volver a Auditoría
+            </button>
+          </div>
 
           <div class="space-y-3 text-xs">
             <div>
@@ -509,33 +512,65 @@
               <input type="text" id="mqlName" value="AI_Strategy" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-mono">
             </div>
 
+            <!-- Activo y Timeframe -->
+            <div class="grid grid-cols-2 gap-2">
+              <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+                <span class="text-slate-500 block text-[10px]">Activo / Símbolo</span>
+                <span id="logicAsset" class="text-emerald-400 font-mono font-medium truncate block">EURUSD</span>
+              </div>
+              <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+                <span class="text-slate-500 block text-[10px]">Timeframe</span>
+                <span id="logicTf" class="text-sky-400 font-mono font-medium">M15</span>
+              </div>
+            </div>
+
+            <!-- Horario de Servidor MT5 -->
+            <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-slate-500 text-[10px]">Horario de Servidor MT5</span>
+                <span class="text-[10px] text-amber-400 font-mono"><i class="fa-regular fa-clock"></i> Sincronizado</span>
+              </div>
+              <div id="logicServerHours" class="text-amber-300 font-mono text-[11px]">08:00 - 20:00 MT5</div>
+            </div>
+
+            <!-- Indicadores / Acción del Precio -->
+            <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+              <span class="text-slate-500 block text-[10px] mb-1">Lógica / Indicadores</span>
+              <div id="logicIndicators" class="text-slate-300 font-mono text-[11px] leading-snug">Acción del Precio Pura</div>
+            </div>
+
             <div>
               <label class="text-slate-400 font-medium block mb-1">Condición Compra (Long)</label>
               <div id="logicBuy" class="bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-emerald-300 font-mono text-[11px] leading-relaxed break-all">
-                buf_fast_ema[0] > buf_slow_ema[0]
+                Pendiente de análisis...
               </div>
             </div>
 
             <div>
               <label class="text-slate-400 font-medium block mb-1">Condición Venta (Short)</label>
               <div id="logicSell" class="bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-rose-300 font-mono text-[11px] leading-relaxed break-all">
-                buf_fast_ema[0] < buf_slow_ema[0]
+                Pendiente de análisis...
               </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-2 pt-2">
-              <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+            <!-- Gestión de Riesgo -->
+            <div class="grid grid-cols-3 gap-2 pt-1">
+              <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 text-center">
                 <span class="text-slate-500 block text-[10px]">Stop Loss</span>
-                <span id="logicSL" class="text-white font-mono font-medium">25 pips</span>
+                <span id="logicSL" class="text-white font-mono font-medium text-xs">25 pips</span>
               </div>
-              <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+              <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 text-center">
                 <span class="text-slate-500 block text-[10px]">Take Profit</span>
-                <span id="logicTP" class="text-white font-mono font-medium">50 pips</span>
+                <span id="logicTP" class="text-white font-mono font-medium text-xs">50 pips</span>
+              </div>
+              <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 text-center">
+                <span class="text-slate-500 block text-[10px]">Ratio R:R</span>
+                <span id="logicRR" class="text-emerald-400 font-mono font-medium text-xs">1:2</span>
               </div>
             </div>
           </div>
 
-          <div class="pt-4 border-t border-slate-800">
+          <div class="pt-3 border-t border-slate-800">
             <button onclick="compileMql5()" id="btnCompile" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20">
               <i class="fa-solid fa-gears"></i> Compilar MQL5 en MetaTrader 5
             </button>
@@ -550,177 +585,21 @@
               <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
               <span class="text-xs font-mono text-slate-300" id="mqlFileName">strategy.mq5</span>
             </div>
-            <button onclick="copyMqlCode()" class="text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 flex items-center gap-1.5">
-              <i class="fa-regular fa-copy"></i> Copiar Código
-            </button>
-          </div>
-          <div class="p-4 flex-1">
-            <textarea id="mqlCodeEditor" class="w-full h-[450px] bg-slate-950 text-slate-200 font-mono text-xs p-4 rounded-xl border border-slate-800 focus:outline-none focus:border-emerald-500 resize-none leading-relaxed"></textarea>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- TAB 4: BACKTESTING EN MT5 -->
-    <section id="tab-backtest" class="tab-pane space-y-6 hidden">
-      <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-6">
-        <div class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-white flex items-center gap-2">
-            <i class="fa-solid fa-play text-emerald-400"></i> Configuración de Backtest en MetaTrader 5
-          </h2>
-          <span class="text-xs text-slate-400 font-mono">Terminal MCP Strategy Tester</span>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 text-xs">
-          <div>
-            <label class="text-slate-400 font-medium block mb-1.5">Símbolo / Par</label>
-            <select id="btSymbol" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white font-mono focus:border-emerald-500">
-              <option value="EURUSD">EURUSD</option>
-              <option value="GBPUSD" selected>GBPUSD</option>
-              <option value="USDJPY">USDJPY</option>
-              <option value="XAUUSD">XAUUSD (Oro)</option>
-              <option value="BTCUSD">BTCUSD</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="text-slate-400 font-medium block mb-1.5">Timeframe</label>
-            <select id="btTimeframe" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white font-mono focus:border-emerald-500">
-              <option value="M5">M5 (5 Minutos)</option>
-              <option value="M15">M15 (15 Minutos)</option>
-              <option value="H1" selected>H1 (1 Hora)</option>
-              <option value="H4">H4 (4 Horas)</option>
-              <option value="D1">D1 (Diario)</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="text-slate-400 font-medium block mb-1.5">Desde (YYYY.MM.DD)</label>
-            <input type="text" id="btFromDate" value="2026.08.01" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white font-mono focus:border-emerald-500">
-          </div>
-
-          <div>
-            <label class="text-slate-400 font-medium block mb-1.5">Hasta (YYYY.MM.DD)</label>
-            <input type="text" id="btToDate" value="2026.09.09" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white font-mono focus:border-emerald-500">
-          </div>
-
-          <div>
-            <label class="text-slate-400 font-medium block mb-1.5">Depósito Inicial (USD)</label>
-            <input type="number" id="btDeposit" value="10000" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white font-mono focus:border-emerald-500">
-          </div>
-
-          <div>
-            <label class="text-slate-400 font-medium block mb-1.5">Apalancamiento</label>
-            <select id="btLeverage" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white font-mono focus:border-emerald-500">
-              <option value="50">1:50</option>
-              <option value="100" selected>1:100</option>
-              <option value="500">1:500</option>
-            </select>
-          </div>
-
-          <div class="md:col-span-2">
-            <label class="text-slate-400 font-medium block mb-1.5">Modelo de Simulación</label>
-            <select id="btModel" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white font-mono focus:border-emerald-500">
-              <option value="1" selected>OHLC en 1 minuto (Rápido y de alta precisión)</option>
-              <option value="0">Cada tick basado en ticks reales (Ultra preciso institucional)</option>
-              <option value="2">Sólo precios de apertura</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="pt-4 flex items-center justify-between border-t border-slate-800">
-          <div class="text-xs text-slate-400 flex items-center gap-2">
-            <i class="fa-solid fa-shield-halved text-emerald-400"></i> Ejecución nativa mediante Strategy Tester de MetaTrader 5
-          </div>
-          <button onclick="startBacktest()" id="btnStartBacktest" class="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-sky-600 hover:from-emerald-500 hover:to-sky-500 text-white font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-600/20">
-            <i class="fa-solid fa-play"></i> Iniciar Backtest en MT5
-          </button>
-        </div>
-
-        <!-- Backtest Live Monitor -->
-        <div id="btMonitor" class="hidden p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-          <div class="flex items-center justify-between text-xs font-mono">
-            <span class="text-slate-300 flex items-center gap-2" id="btMonitorStatus">
-              <i class="fa-solid fa-spinner fa-spin text-emerald-400"></i> Simulando trades en Strategy Tester...
-            </span>
-            <span class="text-slate-500" id="btRunIdBadge">Run ID: -</span>
-          </div>
-          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-            <div id="btProgressBar" class="bg-gradient-to-r from-emerald-500 to-sky-500 h-full w-1/4 transition-all duration-300"></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- TAB 5: MÉTRICAS & VEREDICTO DE LA IA -->
-    <section id="tab-results" class="tab-pane space-y-6 hidden">
-      
-      <!-- Key Performance Metrics Cards -->
-      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
-          <span class="text-xs text-slate-400 block mb-1">Beneficio Neto</span>
-          <span id="resProfit" class="text-xl font-bold font-mono text-emerald-400">$0.00</span>
-        </div>
-        <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
-          <span class="text-xs text-slate-400 block mb-1">Profit Factor</span>
-          <span id="resProfitFactor" class="text-xl font-bold font-mono text-white">0.00</span>
-        </div>
-        <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
-          <span class="text-xs text-slate-400 block mb-1">Max Drawdown</span>
-          <span id="resDrawdown" class="text-xl font-bold font-mono text-rose-400">0.00%</span>
-        </div>
-        <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
-          <span class="text-xs text-slate-400 block mb-1">Win Rate %</span>
-          <span id="resWinRate" class="text-xl font-bold font-mono text-sky-400">0.0%</span>
-        </div>
-        <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
-          <span class="text-xs text-slate-400 block mb-1">Total Operaciones</span>
-          <span id="resTrades" class="text-xl font-bold font-mono text-white">0</span>
-        </div>
-        <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
-          <span class="text-xs text-slate-400 block mb-1">Ratio Sharpe</span>
-          <span id="resSharpe" class="text-xl font-bold font-mono text-slate-300">0.00</span>
-        </div>
-      </div>
-
-      <!-- Equity Curve Chart & AI Verdict -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-2 bg-slate-900 p-6 rounded-2xl border border-slate-800 flex flex-col">
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="text-base font-semibold text-white flex items-center gap-2">
-              <i class="fa-solid fa-chart-area text-emerald-400"></i> Curva de Balance & Equidad
-            </h3>
-            <span class="text-xs font-mono text-slate-400">Generado en MetaTrader 5</span>
-          </div>
-          <div class="flex-1 min-h-[320px]">
-            <canvas id="equityChart"></canvas>
-          </div>
-        </div>
-
-        <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4 flex flex-col justify-between">
-          <div>
-            <h3 class="text-base font-semibold text-white flex items-center gap-2 mb-3">
-              <i class="fa-solid fa-microchip text-sky-400"></i> Auditoría & Veredicto AI
-            </h3>
-
-            <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-              <span class="text-xs text-slate-500 block">Evaluación de Robustez:</span>
-              <div id="aiVerdictBadge" class="text-sm font-bold font-mono text-emerald-400 flex items-center gap-2">
-                <i class="fa-solid fa-circle-check"></i> Esperando resultados...
-              </div>
-              <p id="aiVerdictDesc" class="text-xs text-slate-300 leading-relaxed">
-                Ejecuta un backtest en la pestaña 4 para que el auditor evalúe el drawdown, factor de recuperación y consistencia del edge.
-              </p>
+            <div class="flex items-center gap-2">
+              <button onclick="downloadMqlFile()" class="text-xs text-emerald-300 hover:text-white px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-500/30 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-download"></i> Descargar .mq5
+              </button>
+              <button onclick="copyMqlCode()" class="text-xs text-slate-300 hover:text-white px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center gap-1.5 transition border border-slate-700">
+                <i class="fa-regular fa-copy"></i> Copiar Código
+              </button>
             </div>
           </div>
-
-          <button onclick="switchTab('tab-backtest')" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-2">
-            <i class="fa-solid fa-sliders"></i> Ajustar Parámetros y Re-testear
-          </button>
+          <div class="p-4 flex-1">
+            <textarea id="mqlCodeEditor" class="w-full h-[520px] bg-slate-950 text-slate-200 font-mono text-xs p-4 rounded-xl border border-slate-800 focus:outline-none focus:border-emerald-500 resize-none leading-relaxed"></textarea>
+          </div>
         </div>
-      </div>
 
+      </div>
     </section>
 
   </main>

@@ -8,7 +8,6 @@ let equityChart = null;
 // Initialize when page loads
 document.addEventListener("DOMContentLoaded", () => {
   fetchSystemStatus();
-  initEquityChart();
   // Pre-load default search in Radar tab
   executeScraperSearch("profitable trading strategy 2026");
 });
@@ -62,17 +61,14 @@ async function fetchSystemStatus() {
       const acc = data.account;
       accSummary.innerText = `${acc.login || '53066560'} (${acc.server || 'ICMarkets'}) | $${(acc.balance || 412.76).toFixed(2)} ${acc.currency || 'USD'}`;
       
-      // Populate symbols dropdown
-      if (data.symbols && data.symbols.length > 0) {
-        const symbolSelect = document.getElementById("btSymbol");
-        symbolSelect.innerHTML = "";
-        data.symbols.forEach(sym => {
-          const opt = document.createElement("option");
-          opt.value = sym;
-          opt.innerText = sym;
-          if (sym === "GBPUSD") opt.selected = true;
-          symbolSelect.appendChild(opt);
-        });
+      // Update MT5 Trade Server Time in top bar
+      if (data.time_info && data.time_info.trade_server_last_known_time) {
+        const rawTime = data.time_info.trade_server_last_known_time;
+        const timePart = rawTime.includes("T") ? rawTime.split("T")[1].substring(0, 5) : rawTime;
+        const serverEl = document.getElementById("serverTimeText");
+        if (serverEl) {
+          serverEl.innerText = `Servidor MT5: ${timePart} (GMT+3)`;
+        }
       }
     } else {
       badgeText.innerText = "MT5 MCP Desconectado";
@@ -348,8 +344,15 @@ function handleExtractionSuccess(data) {
   const syms = (currentStrategy.recommended_symbols || ["EURUSD"]).join(", ");
   const tf = currentStrategy.recommended_timeframe || "H1";
   document.getElementById("prevTf").innerText = `${syms} (${tf})`;
-  const inds = (currentStrategy.indicators || []).map(i => i.name).join(", ");
-  document.getElementById("prevIndicators").innerText = inds || "EMAs / RSI";
+  let indsDisplay = "";
+  if (currentAudit && currentAudit.indicators && currentAudit.indicators.length > 0) {
+    indsDisplay = currentAudit.indicators.map(i => i.name).join(", ");
+  } else if (currentStrategy && currentStrategy.indicators && currentStrategy.indicators.length > 0) {
+    indsDisplay = currentStrategy.indicators.map(i => i.name).join(", ");
+  } else {
+    indsDisplay = "Acción del Precio Pura (Sin Indicadores)";
+  }
+  document.getElementById("prevIndicators").innerText = indsDisplay;
 
   // Rellenar pestaña 3: Auditoría & Extracción Exhaustiva
   renderAuditData(currentAudit, currentStrategy);
@@ -452,6 +455,81 @@ function renderAuditData(audit, strategy) {
     document.getElementById("auditLotSizing").innerText = rm.lot_sizing || "0.01 lotes por cada $1,000 o 1% de riesgo institucional.";
   }
   document.getElementById("auditSecrets").innerText = audit.secrets_and_traps || "Gestión disciplinada de riesgo y paciencia.";
+
+  // Sincronizar automáticamente el panel izquierdo del Paso 4
+  syncStrategyToMql5Panel(audit, strategy, currentMql5Code);
+}
+
+function syncStrategyToMql5Panel(audit, strategy, mql5Code) {
+  if (!strategy) return;
+  const safeName = strategy.name || "AI_Strategy";
+  const mqlInput = document.getElementById("mqlName");
+  if (mqlInput) mqlInput.value = safeName;
+  
+  const mqlFile = document.getElementById("mqlFileName");
+  if (mqlFile) mqlFile.innerText = `${safeName}.mq5`;
+
+  // Activo & Timeframe
+  const assetEl = document.getElementById("logicAsset");
+  if (assetEl) assetEl.innerText = (audit?.symbols || strategy.recommended_symbols || ["EURUSD"]).join(", ");
+
+  const tfEl = document.getElementById("logicTf");
+  if (tfEl) tfEl.innerText = audit?.timeframe || strategy.recommended_timeframe || "M15";
+
+  // Horario de Servidor MT5
+  const hoursEl = document.getElementById("logicServerHours");
+  if (hoursEl) {
+    if (audit?.trading_hours?.operating_window) {
+      hoursEl.innerText = audit.trading_hours.operating_window;
+    } else {
+      const sh = String(strategy.start_hour ?? 15).padStart(2, '0');
+      const sm = String(strategy.start_minute ?? 0).padStart(2, '0');
+      const eh = String(strategy.end_hour ?? 17).padStart(2, '0');
+      const em = String(strategy.end_minute ?? 0).padStart(2, '0');
+      hoursEl.innerText = `${sh}:${sm} - ${eh}:${em} MT5 (Servidor)`;
+    }
+  }
+
+  // Indicadores / Lógica
+  const indEl = document.getElementById("logicIndicators");
+  if (indEl) {
+    if (audit?.indicators && audit.indicators.length > 0) {
+      indEl.innerText = audit.indicators.map(i => i.name).join(", ");
+    } else if (strategy.indicators && strategy.indicators.length > 0) {
+      indEl.innerText = strategy.indicators.map(i => i.name).join(", ");
+    } else {
+      indEl.innerText = "Acción del Precio Pura (Sin Indicadores)";
+    }
+  }
+
+  // Reglas C++
+  const buyEl = document.getElementById("logicBuy");
+  if (buyEl) buyEl.innerText = strategy.entry_buy_code || "Sin condición";
+
+  const sellEl = document.getElementById("logicSell");
+  if (sellEl) sellEl.innerText = strategy.entry_sell_code || "Sin condición";
+
+  // Gestión de Riesgo
+  const slEl = document.getElementById("logicSL");
+  if (slEl) {
+    slEl.innerText = audit?.risk_management?.stop_loss || 
+      (strategy.stop_loss_points ? (strategy.stop_loss_points / 10) + " pips" : "25 pips");
+  }
+
+  const tpEl = document.getElementById("logicTP");
+  if (tpEl) {
+    tpEl.innerText = audit?.risk_management?.take_profit || 
+      (strategy.take_profit_points ? (strategy.take_profit_points / 10) + " pips" : "50 pips");
+  }
+
+  const rrEl = document.getElementById("logicRR");
+  if (rrEl) {
+    rrEl.innerText = audit?.risk_management?.risk_reward_ratio || "1:1";
+  }
+
+  // Editor MQL5
+  const editorEl = document.getElementById("mqlCodeEditor");
+  if (editorEl && mql5Code) editorEl.value = mql5Code;
 }
 
 async function proceedToMql5Generation() {
@@ -472,12 +550,8 @@ async function proceedToMql5Generation() {
       }
     }
 
-    document.getElementById("mqlName").value = currentStrategy?.name || "AI_Strategy";
-    document.getElementById("mqlCodeEditor").value = currentMql5Code || "";
-    document.getElementById("logicBuy").innerText = currentStrategy?.entry_buy_code || "Sin código";
-    document.getElementById("logicSell").innerText = currentStrategy?.entry_sell_code || "Sin código";
-    document.getElementById("logicSL").innerText = (currentStrategy?.stop_loss_points ? (currentStrategy.stop_loss_points / 10) : 25) + " pips";
-    document.getElementById("logicTP").innerText = (currentStrategy?.take_profit_points ? (currentStrategy.take_profit_points / 10) : 50) + " pips";
+    // Sincronizar todos los campos hacia el Paso 4
+    syncStrategyToMql5Panel(currentAudit, currentStrategy, currentMql5Code);
 
     // Pasar al Paso 4: Código MQL5 & Compilación
     switchTab("tab-mql5");
@@ -504,6 +578,7 @@ function showLoading(show, message = "") {
 
 async function compileMql5() {
   const code = document.getElementById("mqlCodeEditor").value;
+  const eaName = (document.getElementById("mqlName").value || "AI_Strategy").trim();
   const btn = document.getElementById("btnCompile");
   const fb = document.getElementById("compileFeedback");
 
@@ -514,18 +589,17 @@ async function compileMql5() {
     const res = await fetch("/api/compile", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mql5_code: code, ea_name: "01_macd_pullback" })
+      body: JSON.stringify({ mql5_code: code, ea_name: eaName })
     });
     const data = await res.json();
     fb.classList.remove("hidden");
 
     if (data.success) {
       fb.className = "mt-3 text-xs font-mono p-3 rounded-lg bg-emerald-950/60 border border-emerald-800 text-emerald-300";
-      fb.innerHTML = `<strong>✅ Compilación Exitosa (0 errores, 0 warnings)</strong><br><span class="text-slate-400">Listo para backtest en: ${data.relative_ea}</span>`;
-      setTimeout(() => switchTab("tab-backtest"), 1500);
+      fb.innerHTML = `<strong>✅ Compilación Exitosa en MetaTrader 5 (0 errores, 0 warnings)</strong><br><span class="text-slate-300">Expert Advisor (.ex5) compilado y disponible en: <code>${data.relative_ea || 'Experts/' + eaName + '.ex5'}</code></span>`;
     } else {
       fb.className = "mt-3 text-xs font-mono p-3 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300";
-      fb.innerHTML = `<strong>❌ Error de Compilación:</strong><br><pre class="text-[10px] mt-1 whitespace-pre-wrap">${data.log}</pre>`;
+      fb.innerHTML = `<strong>❌ Error de Compilación:</strong><br><pre class="text-[10px] mt-1 whitespace-pre-wrap">${data.log || data.message || "Error al compilar en MetaEditor"}</pre>`;
     }
   } catch (err) {
     fb.classList.remove("hidden");
@@ -539,193 +613,22 @@ async function compileMql5() {
 
 function copyMqlCode() {
   const code = document.getElementById("mqlCodeEditor").value;
+  if (!code) return alert("No hay código MQL5 para copiar.");
   navigator.clipboard.writeText(code);
   alert("Código MQL5 copiado al portapapeles.");
 }
 
-// ==================== BACKTESTING ====================
-
-async function startBacktest() {
-  const symbol = document.getElementById("btSymbol").value;
-  const timeframe = document.getElementById("btTimeframe").value;
-  const fromDate = document.getElementById("btFromDate").value;
-  const toDate = document.getElementById("btToDate").value;
-  const deposit = parseFloat(document.getElementById("btDeposit").value) || 10000;
-  const leverage = parseInt(document.getElementById("btLeverage").value) || 100;
-  const model = parseInt(document.getElementById("btModel").value) || 1;
-
-  const btn = document.getElementById("btnStartBacktest");
-  const monitor = document.getElementById("btMonitor");
-  const bar = document.getElementById("btProgressBar");
-  const statusLabel = document.getElementById("btMonitorStatus");
-  const runBadge = document.getElementById("btRunIdBadge");
-
-  btn.disabled = true;
-  monitor.classList.remove("hidden");
-  bar.style.width = "20%";
-  statusLabel.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-emerald-400"></i> Enviando tarea a Strategy Tester...`;
-
-  try {
-    const res = await fetch("/api/backtest/run", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ea_relative_name: "CodexResearch\\01_macd_pullback.ex5",
-        symbol: symbol,
-        timeframe: timeframe,
-        from_date: fromDate,
-        to_date: toDate,
-        deposit: deposit,
-        model: model,
-        leverage: leverage
-      })
-    });
-    const data = await res.json();
-    if (!data.success) {
-      alert("Error al iniciar backtest: " + (data.error || "Desconocido"));
-      btn.disabled = false;
-      monitor.classList.add("hidden");
-      return;
-    }
-
-    currentRunId = data.run_id;
-    runBadge.innerText = `Run ID: ${currentRunId}`;
-    bar.style.width = "40%";
-    statusLabel.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-emerald-400"></i> Ejecutando simulación en ticks históricos...`;
-
-    pollBacktestStatus(currentRunId);
-  } catch (e) {
-    alert("Error de conexión al iniciar backtest: " + e.message);
-    btn.disabled = false;
-    monitor.classList.add("hidden");
-  }
-}
-
-function pollBacktestStatus(runId) {
-  let progress = 40;
-  const bar = document.getElementById("btProgressBar");
-  const statusLabel = document.getElementById("btMonitorStatus");
-
-  const interval = setInterval(async () => {
-    try {
-      const res = await fetch(`/api/backtest/status/${runId}`);
-      const data = await res.json();
-
-      progress = Math.min(progress + 8, 90);
-      bar.style.width = `${progress}%`;
-
-      if (data.finished) {
-        clearInterval(interval);
-        bar.style.width = "100%";
-        statusLabel.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i> Simulación finalizada. Extrayendo métricas...`;
-        setTimeout(() => fetchReport(runId), 800);
-      }
-    } catch (e) {
-      console.warn("Polling error:", e);
-    }
-  }, 2000);
-}
-
-async function fetchReport(runId) {
-  try {
-    const res = await fetch(`/api/backtest/report/${runId}`);
-    const data = await res.json();
-
-    if (!data.success) {
-      alert("Error al obtener reporte: " + data.error);
-      return;
-    }
-
-    const s = data.summary;
-    const r = data.report;
-
-    const profitEl = document.getElementById("resProfit");
-    profitEl.innerText = `$${s.profit.toFixed(2)}`;
-    profitEl.className = s.profit >= 0 ? "text-xl font-bold font-mono text-emerald-400" : "text-xl font-bold font-mono text-rose-400";
-
-    document.getElementById("resProfitFactor").innerText = s.profit_factor.toFixed(2);
-    document.getElementById("resDrawdown").innerText = `${s.drawdown_pct.toFixed(2)}%`;
-    document.getElementById("resWinRate").innerText = `${s.win_rate.toFixed(1)}%`;
-    document.getElementById("resTrades").innerText = s.trades;
-    document.getElementById("resSharpe").innerText = s.sharpe_ratio.toFixed(2);
-
-    const badge = document.getElementById("aiVerdictBadge");
-    const desc = document.getElementById("aiVerdictDesc");
-    badge.innerText = s.verdict;
-
-    if (s.profit > 0 && s.profit_factor > 1.3) {
-      badge.className = "text-sm font-bold font-mono text-emerald-400 flex items-center gap-2";
-      desc.innerText = `Excelente desempeño: Profit Factor de ${s.profit_factor.toFixed(2)} con Drawdown controlado de ${s.drawdown_pct.toFixed(1)}%. La estrategia demuestra ventaja estadística comprobada en ${r.symbol}.`;
-    } else {
-      badge.className = "text-sm font-bold font-mono text-amber-400 flex items-center gap-2";
-      desc.innerText = `Atención: La relación beneficio/riesgo (PF: ${s.profit_factor.toFixed(2)}) o el Drawdown (${s.drawdown_pct.toFixed(1)}%) sugieren ajustar los filtros de tendencia o el ratio Take Profit / Stop Loss para optimizar los resultados.`;
-    }
-
-    updateEquityChart(r);
-    switchTab("tab-results");
-  } catch (e) {
-    alert("Error procesando reporte: " + e.message);
-  } finally {
-    document.getElementById("btnStartBacktest").disabled = false;
-  }
-}
-
-function initEquityChart() {
-  const ctx = document.getElementById("equityChart").getContext("2d");
-  equityChart = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: ["Inicio", "T1", "T2", "T3", "T4", "T5", "T6", "Fin"],
-      datasets: [
-        {
-          label: "Balance ($)",
-          data: [10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000],
-          borderColor: "#10b981",
-          backgroundColor: "rgba(16, 185, 129, 0.1)",
-          fill: true,
-          tension: 0.3
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { labels: { color: "#94a3b8", font: { family: "JetBrains Mono" } } }
-      },
-      scales: {
-        x: { grid: { color: "#1e293b" }, ticks: { color: "#64748b" } },
-        y: { grid: { color: "#1e293b" }, ticks: { color: "#64748b" } }
-      }
-    }
-  });
-}
-
-function updateEquityChart(report) {
-  if (!equityChart) return;
-  const initial = report.initial_deposit || 10000;
-  const final = initial + (report.profit || 0);
-  const minBal = report.balance_min || (initial - 200);
-
-  const tradesCount = Math.max(report.trades || 8, 4);
-  const labels = [];
-  const points = [];
-
-  for (let i = 0; i <= tradesCount; i++) {
-    labels.push(`Op ${i}`);
-    if (i === 0) points.push(initial);
-    else if (i === tradesCount) points.push(final);
-    else {
-      const progress = i / tradesCount;
-      const interp = initial + (final - initial) * progress;
-      const jitter = (Math.sin(i) * (initial - minBal) * 0.4);
-      points.push(Math.round((interp - jitter) * 100) / 100);
-    }
-  }
-
-  equityChart.data.labels = labels;
-  equityChart.data.datasets[0].data = points;
-  equityChart.data.datasets[0].borderColor = (final >= initial) ? "#10b981" : "#f43f5e";
-  equityChart.data.datasets[0].backgroundColor = (final >= initial) ? "rgba(16, 185, 129, 0.1)" : "rgba(244, 63, 94, 0.1)";
-  equityChart.update();
+function downloadMqlFile() {
+  const code = document.getElementById("mqlCodeEditor").value;
+  if (!code) return alert("No hay código MQL5 para descargar.");
+  const eaName = (document.getElementById("mqlName").value || "AI_Strategy").replace(/[^a-zA-Z0-9_]/g, "_");
+  const blob = new Blob([code], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${eaName}.mq5`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }

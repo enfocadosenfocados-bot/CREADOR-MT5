@@ -4,7 +4,11 @@ import re
 import urllib.request
 import urllib.parse
 from typing import List, Dict, Any, Optional
-from duckduckgo_search import DDGS
+try:
+    from ddgs import DDGS
+except ImportError:
+    from duckduckgo_search import DDGS
+
 from bs4 import BeautifulSoup
 
 class StrategyScraper:
@@ -81,25 +85,53 @@ class StrategyScraper:
         return results
 
     @staticmethod
-    def scrape_url_content(url: str) -> str:
-        """Fetch and extract clean text from any web strategy page or forum post."""
+    def scrape_page_details(url: str):
+        """Fetch and extract clean text, title, and author from any web strategy page or forum post."""
         try:
             headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
             req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=10) as response:
+            with urllib.request.urlopen(req, timeout=12) as response:
                 html = response.read().decode('utf-8', errors='ignore')
                 soup = BeautifulSoup(html, "html.parser")
                 
+                # Extract title
+                title = ""
+                if soup.title and soup.title.string:
+                    title = soup.title.string.strip()
+                if not title:
+                    h1 = soup.find("h1")
+                    if h1:
+                        title = h1.get_text().strip()
+
+                # Extract author
+                author = ""
+                meta_author = soup.find("meta", attrs={"name": re.compile(r"author", re.I)})
+                if not meta_author:
+                    meta_author = soup.find("meta", attrs={"property": re.compile(r"author", re.I)})
+                if meta_author and meta_author.get("content"):
+                    author = meta_author.get("content").strip()
+                
+                if not author:
+                    parsed = urllib.parse.urlparse(url)
+                    netloc = parsed.netloc.replace("www.", "")
+                    author = netloc.split(".")[0].capitalize()
+
                 # Remove scripts, styles, navigation, footer
-                for s in soup(["script", "style", "nav", "footer", "header", "aside"]):
+                for s in soup(["script", "style", "nav", "footer", "header", "aside", "svg"]):
                     s.decompose()
                     
                 text = soup.get_text(separator="\n")
                 lines = [line.strip() for line in text.splitlines() if line.strip()]
-                clean_text = "\n".join(lines[:120]) # Limit to key lines
-                return clean_text
+                clean_text = "\n".join(lines[:200])
+                return clean_text, title, author
         except Exception as e:
-            return f"Error extracting page content: {e}"
+            return f"Error extracting page content: {e}", "Estrategia Web", "Web"
+
+    @staticmethod
+    def scrape_url_content(url: str) -> str:
+        """Fetch and extract clean text from any web strategy page or forum post."""
+        clean_text, _, _ = StrategyScraper.scrape_page_details(url)
+        return clean_text
 
     @classmethod
     def exhaustive_search(cls, keyword: str = "profitable trading strategy", category: str = "all") -> List[Dict[str, Any]]:

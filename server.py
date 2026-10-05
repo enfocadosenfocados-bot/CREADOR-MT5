@@ -77,6 +77,8 @@ class ExtractURLRequest(BaseModel):
 class ExtractTextRequest(BaseModel):
     title: str = "Estrategia Personalizada"
     content: str
+    author: Optional[str] = ""
+    url: Optional[str] = ""
 
 class CompileRequest(BaseModel):
     mql5_code: str
@@ -145,10 +147,12 @@ def get_system_status():
         connected = mt5_client.initialize()
         acc = mt5_client.get_account_summary()
         symbols = mt5_client.get_symbols()
+        time_info = mt5_client.get_time_info()
         return {
             "status": "online" if connected else "offline",
             "account": acc.get("account", {}),
             "terminal": acc.get("terminal", {}),
+            "time_info": time_info,
             "symbols": symbols[:40] if symbols else ["EURUSD", "GBPUSD"]
         }
     except Exception as e:
@@ -174,16 +178,22 @@ def search_strategies_endpoint(q: str = "profitable trading strategy", category:
 def import_scraped_strategy_endpoint(req: ImportScrapedRequest):
     """Import any discovered strategy from web or video and feed directly into AI MQL5 pipeline."""
     try:
-        content = ""
-        if req.type == "video" or "youtube.com" in req.url or "youtu.be" in req.url:
-            media = strategy_extractor.download_media_from_url(req.url, UPLOAD_DIR)
+        url = req.url.strip()
+        author = ""
+        title = req.title
+        if req.type == "video" or "youtube.com" in url or "youtu.be" in url:
+            media = strategy_extractor.download_media_from_url(url, UPLOAD_DIR)
             transcript = media.get("transcript", "")
-            content = f"Title: {media.get('title')}\nDescription: {media.get('description')}\n\nTranscript:\n{transcript}"
+            title = media.get("title") or req.title
+            author = media.get("author") or "Trader"
+            content = f"Title: {title}\nAuthor/Trader: {author}\nSource: {url}\nDescription: {media.get('description', '')}\n\nTranscript:\n{transcript}"
         else:
-            page_text = StrategyScraper.scrape_url_content(req.url)
-            content = f"Title: {req.title}\nSource: {req.url}\n\nContent:\n{page_text}"
+            page_text, page_title, page_author = StrategyScraper.scrape_page_details(url)
+            title = page_title or req.title
+            author = page_author or "Trader"
+            content = f"Title: {title}\nAuthor/Trader: {author}\nSource: {url}\n\nContent:\n{page_text}"
 
-        return extract_from_text(ExtractTextRequest(title=req.title, content=content))
+        return extract_from_text(ExtractTextRequest(title=title, content=content, author=author, url=url))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error importing strategy: {str(e)}")
 
@@ -206,7 +216,12 @@ def generate_mql5_endpoint(req: GenerateMql5Request):
 @app.post("/api/extract/text")
 def extract_from_text(req: ExtractTextRequest):
     try:
-        extraction = strategy_extractor.analyze_strategy_text(req.content, req.title)
+        extraction = strategy_extractor.analyze_strategy_text(
+            raw_text=req.content,
+            context_title=req.title,
+            author=req.author or "",
+            source_url=req.url or ""
+        )
         audit_data = extraction.get("audit") or {}
         strategy_data = extraction.get("strategy") or extraction
         mql5_code = MQL5Generator.generate(strategy_data)
@@ -219,7 +234,12 @@ def extract_from_text(req: ExtractTextRequest):
     except Exception as e:
         print(f"Error in extract_from_text: {e}")
         from strategy_extractor import DeepStrategyAnalyzer
-        fallback_res = DeepStrategyAnalyzer.analyze(req.content, req.title)
+        fallback_res = DeepStrategyAnalyzer.analyze(
+            raw_text=req.content,
+            context_title=req.title,
+            author=req.author or "",
+            source_url=req.url or ""
+        )
         audit_data = fallback_res.get("audit") or {}
         strategy_data = fallback_res.get("strategy") or fallback_res
         mql5_code = MQL5Generator.generate(strategy_data)
@@ -233,18 +253,37 @@ def extract_from_text(req: ExtractTextRequest):
 
 @app.post("/api/extract/url")
 def extract_from_url(req: ExtractURLRequest):
-    try:
-        media_info = strategy_extractor.download_media_from_url(req.url, UPLOAD_DIR)
-        title = media_info.get("title", "Video Strategy")
+    url = req.url.strip()
+    is_video = any(dom in url.lower() for dom in ["youtube.com", "youtu.be", "tiktok.com", "instagram.com", "facebook.com", "fb.watch", "vimeo.com", "twitter.com", "x.com"])
+
+    media_info = None
+    if is_video:
+        try:
+            media_info = strategy_extractor.download_media_from_url(url, UPLOAD_DIR)
+        except Exception as e:
+            print(f"Error downloading video: {e}")
+            media_info = None
+
+    if media_info and (media_info.get("transcript") or media_info.get("description") or media_info.get("title")):
+        title = media_info.get("title") or "Estrategia en Video"
+        author = media_info.get("author") or "Trader"
         desc = media_info.get("description", "")
         transcript = media_info.get("transcript", "")
-        content = f"Title: {title}\nDescription: {desc}\n\nTranscript:\n{transcript}"
-        return extract_from_text(ExtractTextRequest(title=title, content=content))
-    except Exception as e:
-        print(f"Error downloading/extracting media: {e}")
-        clean_title = "Video_Strategy"
-        content = f"URL: {req.url}\nEstrategia algoritmica analizada."
-        return extract_from_text(ExtractTextRequest(title=clean_title, content=content))
+        content = f"Title: {title}\nAuthor/Trader: {author}\nSource: {url}\n\nDescription:\n{desc}\n\nTranscript / Subtítulos:\n{transcript}"
+        return extract_from_text(ExtractTextRequest(title=title, content=content, author=author, url=url))
+    else:
+        # Fallback a scraping web de página/artículo/foro
+        try:
+            page_text, page_title, page_author = StrategyScraper.scrape_page_details(url)
+            title = page_title or "Estrategia Web"
+            author = page_author or "Trader"
+            content = f"Title: {title}\nAuthor/Trader: {author}\nSource: {url}\n\nContenido del Artículo:\n{page_text}"
+            return extract_from_text(ExtractTextRequest(title=title, content=content, author=author, url=url))
+        except Exception as e:
+            print(f"Error in web scraping fallback: {e}")
+            clean_title = "Estrategia Cuantitativa"
+            content = f"Title: {clean_title}\nSource: {url}\nEstrategia de trading analizada."
+            return extract_from_text(ExtractTextRequest(title=clean_title, content=content, author="Trader", url=url))
 
 @app.post("/api/extract/pdf")
 async def extract_from_pdf(file: UploadFile = File(...)):
