@@ -57,9 +57,16 @@ class MQL5Generator:
         inputs_code.append(f'input group "=== Spread and Safety Filter ==="')
         inputs_code.append(f'input int    InpMaxSpreadPoints= {max_spread};       // Max Allowed Spread (Points, 0=Off)')
         
-        if custom_inputs:
+        standard_input_names = {
+            "InpLotSize", "InpStopLossPips", "InpTakeProfitPips", "InpBreakEvenPips", "InpTrailingPips",
+            "InpMagicNumber", "InpSlippage", "InpUseTimeFilter", "InpStartHour", "InpStartMinute",
+            "InpEndHour", "InpEndMinute", "InpFilterFriday", "InpMaxSpreadPoints"
+        }
+        
+        filtered_custom = [inp for inp in custom_inputs if inp.get("name") not in standard_input_names]
+        if filtered_custom:
             inputs_code.append(f'input group "=== Strategy Parameters ==="')
-            for inp in custom_inputs:
+            for inp in filtered_custom:
                 inputs_code.append(f"input {inp['type']} {inp['name']} = {inp['default']}; // {inp.get('comment', inp['name'])}")
 
         # Build indicator handle declarations and init code

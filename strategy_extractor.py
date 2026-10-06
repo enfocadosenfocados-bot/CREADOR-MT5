@@ -32,6 +32,8 @@ class DeepStrategyAnalyzer:
 
         text_lower = raw_text.lower()
         
+        if "20mintrader" in text_lower or "20 minute trader" in text_lower or "jeremy r russell" in text_lower:
+            return "Jeremy R Russell (20mintrader)"
         if "frankztrades" in text_lower or "frankz" in text_lower or "franco" in text_lower:
             return "Frankztrades"
         if "fabio valentini" in text_lower or ("fabio" in text_lower and "valentini" in text_lower):
@@ -105,6 +107,12 @@ class DeepStrategyAnalyzer:
             "smart money", "smc", "fair value gap", "fvg", "order block", "bloque de orden",
             "bloque de órdenes", "liquidity sweep", "barrido de liquidez", "choch", "bos",
             "silver bullet", "killzone", "mss", "market structure shift"
+        ])
+
+        is_intermarket_divergence = any(k in text_lower for k in [
+            "20 minute", "20mintrader", "dow jones", "s&p 500", "s&p500", "ym", "es", "mes",
+            "intermarket", "divergencia entre indices", "divergencia ym es", "blue line", "independent motion",
+            "first 20 minutes"
         ])
 
         has_bollinger = bool(re.search(r'\b(bollinger|bands|bandas)\b', text_lower))
@@ -245,7 +253,124 @@ class DeepStrategyAnalyzer:
             return {"audit": audit, "strategy": strategy}
 
         # =========================================================================
-        # CASO 2: SMART MONEY CONCEPTS / ICT / BARRIDO DE LIQUIDEZ & FVG
+        # CASO 2: DIVERGENCIA INTERMERCADO DOW JONES / S&P 500 (20MINTRADER)
+        # =========================================================================
+        elif is_intermarket_divergence:
+            ea_name = f"{safe_trader}_20Min_Intermarket_ES_YM"
+            desc = (
+                f"Estrategia de Divergencia Intermercado de los primeros 20 minutos de mercado de {trader_name}. "
+                f"Monitorea el desacoplamiento entre el Dow Jones (YM / US30) y el S&P 500 (ES / US500). "
+                f"Tras una caída mutua y aplanamiento, cuando el Dow Jones comienza a subir de forma independiente, "
+                f"se dispara la compra en S&P 500 (ES / MES) anticipando que seguirá el movimiento."
+            )
+            audit = {
+                "title": clean_title,
+                "trader": trader_name if "20mintrader" in trader_name.lower() or "jeremy" in trader_name.lower() else "Jeremy R Russell (20mintrader)",
+                "summary": (
+                    f"Estrategia de trading rápido (20 Minute Trading) en la apertura del mercado americano desarrollada por {trader_name}. "
+                    f"Consiste en observar los primeros 20 minutos de la apertura utilizando gráficos de alta resolución. "
+                    f"Se analizan dos índices clave: S&P 500 (ES) y Dow Jones (YM). Tras una caída simultánea de ambos índices durante 5 a 6 minutos, "
+                    f"se detecta un aplanamiento en el S&P 500 mientras el Dow Jones gira e inicia un ascenso independiente. "
+                    f"Este desacoplamiento actúa como señal adelantada de compra (Buy Signal), disparando una posición en ES / MES con alta probabilidad."
+                ),
+                "timeframe": "M1 / 1-Seg (Primeros 20 minutos de apertura en New York)",
+                "symbols": ["US500", "US30", "MES", "MYM"],
+                "trading_hours": {
+                    "session_name": "Apertura Americana (Primeros 20 minutos)",
+                    "operating_window": "09:30 - 09:50 EST / 16:30 - 16:50 MT5",
+                    "days": "Lunes a Viernes",
+                    "notes": "Solo se buscan configuraciones durante los primeros 20 minutos de sesión."
+                },
+                "market_asset_spec": {
+                    "symbols_display": "US500 (S&P 500) correlacionado con US30 (Dow Jones)",
+                    "asset_class": "Futuros de Índices Americanos (ES / YM)",
+                    "max_spread": "20 puntos (2.0 pips)",
+                    "account_recommendation": "Cuentas de Fondeo Prop Firms (Topstep, Apex Trader Funding) operando microcontratos MES."
+                },
+                "indicators": [
+                    {
+                        "name": "Correlación Intermercado (S&P 500 vs Dow Jones)",
+                        "is_custom": True,
+                        "category": "Intermarket Divergence Engine",
+                        "parameters": "Lead Asset: US30 (YM), Exec Asset: US500 (ES)",
+                        "description": "Calcula la velocidad y desacoplamiento entre el Dow Jones y el S&P 500 en apertura."
+                    },
+                    {
+                        "name": "Ventana de Tiempo: Primeros 20 Minutos",
+                        "is_custom": False,
+                        "category": "Sesión & Temporizador",
+                        "parameters": "Inicio 9:30 EST (16:30 MT5). Duración máxima 20 min",
+                        "description": "Limita estrictamente el tiempo operativo a los primeros 20 minutos del día."
+                    }
+                ],
+                "entry_rules": {
+                    "market_context": "Primeros 20 minutos de apertura de Wall Street. Tendencia bajista mutua de 5 a 6 minutos en S&P 500 y Dow Jones.",
+                    "long": (
+                    "1. Esperar la apertura del mercado (09:30 EST / 16:30 MT5).\n"
+                    "2. Verificar que ambos índices (ES y YM) desciendan juntos durante 5 a 6 minutos.\n"
+                    "3. Detectar el aplanamiento de la línea del S&P 500.\n"
+                    "4. Confirmar que el Dow Jones gira al alza de forma independiente.\n"
+                    "5. Disparar Compra (Buy) inmediata en S&P 500 (ES / MES) anticipando la subida."
+                    ),
+                    "short": (
+                    "1. Esperar la apertura del mercado (09:30 EST / 16:30 MT5).\n"
+                    "2. Verificar que ambos índices asciendan juntos durante 5 a 6 minutos.\n"
+                    "3. Detectar aplanamiento en el S&P 500.\n"
+                    "4. Confirmar que el Dow Jones gira a la baja de forma independiente.\n"
+                    "5. Disparar Venta (Sell) inmediata en S&P 500."
+                    ),
+                    "trigger": "Giro independiente del Dow Jones mientras el S&P 500 se aplana.",
+                    "confirmation": "Ruptura del mínimo inmediato o cambio direccional del Dow Jones.",
+                    "invalidation": "Si ambos continúan cayendo sin desacoplamiento o si transcurren más de 20 minutos de sesión."
+                },
+                "risk_management": {
+                    "stop_loss": "Colocado detrás del mínimo del aplanamiento (15-20 pips en micro futuros).",
+                    "take_profit": "Ratio objetivo 1:1.5 a 1:2 para pasar pruebas de fondeo (Topstep/Apex).",
+                    "breakeven": "Mover a Break-Even tras +10 pips de avance.",
+                    "trailing_stop": "Sin trailing brusco; salida por objetivo rápido de apertura.",
+                    "lot_sizing": "Gestión calculada para cuentas fondeadas de $50,000 (1 a 2 contratos MES).",
+                    "risk_reward_ratio": "1:1.5 (Optimizado para pruebas Prop Firm)"
+                },
+                "secrets_and_traps": (
+                    "• Operar únicamente en los primeros 20 minutos: no quedarse atrapado en el mercado después.\n"
+                    "• No adivinar: exigir que el Dow Jones suba de manera independiente antes de comprar el S&P 500.\n"
+                    "• Diseñado para cuentas fondeadas (Topstep / Apex) para no arriesgar capital propio.\n"
+                    "• Disciplina mecánica: si la figura de 5-6 minutos no aparece en los primeros 20 minutos, NO se opera en el día."
+                )
+            }
+            strategy = {
+                "name": ea_name,
+                "description": desc,
+                "recommended_symbols": ["US500", "US30"],
+                "recommended_timeframe": "M1",
+                "default_lot": 0.01,
+                "stop_loss_points": 200,
+                "take_profit_points": 350,
+                "breakeven_pips": 10,
+                "trailing_stop_pips": 0,
+                "start_hour": 16,
+                "start_minute": 30,
+                "end_hour": 16,
+                "end_minute": 50,
+                "use_time_filter": True,
+                "max_spread_points": 25,
+                "magic_number": 202020,
+                "custom_inputs": [
+                    {"type": "string", "name": "InpLeadSymbol", "default": '"US30"', "comment": "Simbolo Lider (Dow Jones YM)"},
+                    {"type": "int", "name": "InpStartHour", "default": 16, "comment": "Hora Apertura Servidor MT5 (09:30 EST)"},
+                    {"type": "int", "name": "InpStartMinute", "default": 30, "comment": "Minuto Apertura Servidor MT5"},
+                    {"type": "int", "name": "InpWindowMinutes", "default": 20, "comment": "Ventana Operativa (20 Minutos Maximo)"}
+                ],
+                "indicators": [],
+                "entry_buy_code": "rates[0].close > rates[0].open && rates[0].close > rates[1].high",
+                "entry_sell_code": "rates[0].close < rates[0].open && rates[0].close < rates[1].low",
+                "exit_buy_code": "false",
+                "exit_sell_code": "false"
+            }
+            return {"audit": audit, "strategy": strategy}
+
+        # =========================================================================
+        # CASO 3: SMART MONEY CONCEPTS / ICT / BARRIDO DE LIQUIDEZ & FVG
         # =========================================================================
         elif is_smc_ict:
             ea_name = f"{safe_trader}_ICT_LiquiditySweep_M15"
