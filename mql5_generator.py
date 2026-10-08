@@ -677,40 +677,49 @@ void OnTick()
    double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
    double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
 
+   double min_vol = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+   double max_vol = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
+   double step_vol = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
+   double trade_lot = MathMax(min_vol, InpLotSize);
+   if(max_vol > 0 && trade_lot > max_vol) trade_lot = max_vol;
+   if(step_vol > 0) trade_lot = MathFloor(trade_lot / step_vol) * step_vol;
+
+   double point_scale = (digits == 2 && point == 0.01) ? 1.0 : point;
+
    // SENAL COMPRA: Cierre con cuerpo por encima del High de la primera vela
    if(close_1 > m_range_high && close_1 > open_1)
    {{
       double sl = NormalizeDouble(low_1, digits);
-      if((ask - sl) < (InpFallbackSLPoints * point) / 2)
+      if((ask - sl) < (InpFallbackSLPoints * point_scale) / 2)
          sl = NormalizeDouble(m_range_low, digits);
       if((ask - sl) <= 0)
-         sl = NormalizeDouble(ask - (InpFallbackSLPoints * point), digits);
+         sl = NormalizeDouble(ask - (InpFallbackSLPoints * point_scale), digits);
 
       double risk_dist = ask - sl;
       double tp = NormalizeDouble(ask + (risk_dist * InpRiskRewardRatio), digits);
 
-      if(m_trade.Buy(InpLotSize, _Symbol, ask, sl, tp, "{safe_name}_BUY"))
+      if(m_trade.Buy(trade_lot, _Symbol, ask, sl, tp, "{safe_name}_BUY"))
       {{
          m_traded_today = true;
-         PrintFormat("Compra ejecutada por Ruptura de Primera Vela. Ask=%.5f, SL=%.5f, TP=%.5f (1:1)", ask, sl, tp);
+         PrintFormat("Compra ejecutada por Ruptura de Primera Vela. Ask=%.5f, SL=%.5f, TP=%.5f", ask, sl, tp);
       }}
    }}
    // SENAL VENTA: Cierre con cuerpo por debajo del Low de la primera vela
    else if(close_1 < m_range_low && close_1 < open_1)
    {{
       double sl = NormalizeDouble(high_1, digits);
-      if((sl - bid) < (InpFallbackSLPoints * point) / 2)
+      if((sl - bid) < (InpFallbackSLPoints * point_scale) / 2)
          sl = NormalizeDouble(m_range_high, digits);
       if((sl - bid) <= 0)
-         sl = NormalizeDouble(bid + (InpFallbackSLPoints * point), digits);
+         sl = NormalizeDouble(bid + (InpFallbackSLPoints * point_scale), digits);
 
       double risk_dist = sl - bid;
       double tp = NormalizeDouble(bid - (risk_dist * InpRiskRewardRatio), digits);
 
-      if(m_trade.Sell(InpLotSize, _Symbol, bid, sl, tp, "{safe_name}_SELL"))
+      if(m_trade.Sell(trade_lot, _Symbol, bid, sl, tp, "{safe_name}_SELL"))
       {{
          m_traded_today = true;
-         PrintFormat("Venta ejecutada por Ruptura de Primera Vela. Bid=%.5f, SL=%.5f, TP=%.5f (1:1)", bid, sl, tp);
+         PrintFormat("Venta ejecutada por Ruptura de Primera Vela. Bid=%.5f, SL=%.5f, TP=%.5f", bid, sl, tp);
       }}
    }}
 }}
