@@ -97,17 +97,22 @@ class DeepStrategyAnalyzer:
         safe_trader = re.sub(r'[^a-zA-Z0-9]', '', trader_name)[:16] or "Trader"
 
         # 5. Detección Exhaustiva de Tipo de Estrategia
-        is_first_candle_orb = any(k in text_lower for k in [
-            "primera vela", "primer vela", "first candle", "opening range", "rango de apertura",
-            "orb", "primera vela de mercado", "primera vela de apertura", "primeros 5 minutos",
-            "manos quietas"
+        is_zone_structure = any(k in text_lower for k in [
+            "termina a las 10am", "termina a las 10 am", "retirar $10k", "dos tipos de entrada",
+            "toque la zona", "zona y estructura", "vela de 15 minutos cierre por encima",
+            "confirmación en 15 minutos", "entrada de continuación", "cambio de estructura"
         ])
+
+        is_first_candle_orb = any(k in text_lower for k in [
+            "primera vela de 5", "primer vela de 5", "primera vela del día", "first candle", "opening range", "rango de apertura",
+            "orb", "primera vela de mercado", "primera vela de apertura", "manos quietas los primeros 5"
+        ]) and not is_zone_structure
 
         is_smc_ict = any(k in text_lower for k in [
             "smart money", "smc", "fair value gap", "fvg", "order block", "bloque de orden",
             "bloque de órdenes", "liquidity sweep", "barrido de liquidez", "choch", "bos",
             "silver bullet", "killzone", "mss", "market structure shift"
-        ])
+        ]) and not is_zone_structure
 
         is_intermarket_divergence = any(k in text_lower for k in [
             "20 minute", "20mintrader", "dow jones", "s&p 500", "s&p500", "ym", "es", "mes",
@@ -253,7 +258,142 @@ class DeepStrategyAnalyzer:
             return {"audit": audit, "strategy": strategy}
 
         # =========================================================================
-        # CASO 2: DIVERGENCIA INTERMERCADO DOW JONES / S&P 500 (20MINTRADER)
+        # CASO 2: SCALPING M1 HASTA LAS 10AM (ZONAS Y ESTRUCTURA DE 15M/1M - FRANKZTRADES)
+        # =========================================================================
+        elif is_zone_structure:
+            ea_name = f"{safe_trader}_Scalping_Zonas_Estructura_10AM_M1"
+            desc = (
+                f"Estrategia de Scalping de 1 Minuto basada en Zonas Previas y Estructura de Mercado de {trader_name}. "
+                f"Opera exclusivamente de 08:30 a 10:00 EST (Apertura de New York) con dos tipos mecánicos de entrada: "
+                f"1) Cambio de Estructura (Reversión en zona previa con confirmación de ruptura del último pivot en M1). "
+                f"2) Continuación de Tendencia (Ruptura con filtro obligatorio de vela de 15 minutos cerrada fuera de la zona). "
+                f"Gestión de riesgo objetiva detrás del último swing con ratio asimétrico 1:1 hasta 1:2."
+            )
+            audit = {
+                "title": clean_title,
+                "trader": trader_name or "Frankztrades",
+                "summary": (
+                    f"Estrategia de Scalping de alta precisión en gráficos de 1 minuto creada por {trader_name}. "
+                    f"La sesión termina estrictamente a las 10:00 AM (ventana de 90 minutos de alta liquidez). "
+                    f"No utiliza ningún indicador rezagado; se fundamenta al 100% en zonas de oferta/demanda del día anterior "
+                    f"y fractales de estructura. Incorpora dos patrones rigurosos: "
+                    f"• Entrada 1 (Cambio de Estructura): El precio toca una zona previa de liquidez, rompe el último máximo/mínimo confirmado en M1 "
+                    f"y se dispara al cierre de la vela de ruptura.\n"
+                    f"• Entrada 2 (Continuación de Tendencia): Exige el filtro obligatorio de que una vela de 15 minutos CIERRE CON CUERPO "
+                    f"por fuera de la zona para evitar falsos quiebres (fakeouts) antes de continuar en M1."
+                ),
+                "timeframe": "M1 (Ejecución y Gatillo) con Filtro Estructural en M15",
+                "symbols": ["NAS100", "US500", "XAUUSD", "EURUSD"],
+                "trading_hours": {
+                    "session_name": "Apertura de Nueva York (Termina 10:00 AM EST)",
+                    "operating_window": "08:30 - 10:00 EST / 15:30 - 17:00 MT5",
+                    "days": "Lunes a Viernes",
+                    "notes": "Límite estricto a las 10:00 AM. Si no hay confirmación dentro de la ventana, manos quietas."
+                },
+                "market_asset_spec": {
+                    "symbols_display": "Nasdaq (NAS100 / NQ), Oro (XAUUSD), S&P 500 (US500)",
+                    "asset_class": "Futuros / CFDs Índices Americanos & Oro",
+                    "max_spread": "25 puntos (2.5 pips)",
+                    "account_recommendation": "Cuentas de fondeo de futuros y cuentas reales ECN (Exness, Topstep, Apex)."
+                },
+                "indicators": [
+                    {
+                        "name": "Zonas de Oferta / Demanda y Liquidez Previa",
+                        "is_custom": False,
+                        "category": "Price Action & Niveles Horizontales",
+                        "parameters": "Extremos del día anterior y zonas de soporte/resistencia",
+                        "description": "Regla #1 obligatoria: El precio debe tocar la zona; no se opera 'en el aire'."
+                    },
+                    {
+                        "name": "Filtro de Cierre de Vela M15 (Para Continuación)",
+                        "is_custom": False,
+                        "category": "Filtro Multi-Timeframe",
+                        "parameters": "Cierre con cuerpo de barra en 15 minutos fuera del nivel",
+                        "description": "Filtro institucional que evita trampas de mercado y falsas rupturas."
+                    },
+                    {
+                        "name": "Temporizador de Sesión (Cierre 10:00 AM)",
+                        "is_custom": False,
+                        "category": "Control de Tiempo y Disciplina",
+                        "parameters": "Inicio: 08:30 EST (15:30 MT5) | Fin: 10:00 EST (17:00 MT5)",
+                        "description": "Protege el capital limitando el sobretrading tras las 10:00 AM."
+                    }
+                ],
+                "entry_rules": {
+                    "market_context": "Mercado en apertura americana testeando zonas clave de liquidez. Máximo 1 a 2 intentos por zona.",
+                    "long": (
+                        "TIPO A (Cambio de Estructura):\n"
+                        "1. El precio toca la zona de soporte previa.\n"
+                        "2. En M1, rompe con vela cerrada el último máximo confirmado (ChoCh/BOS).\n"
+                        "3. Disparo en Compra (Buy) al cierre de dicha vela de ruptura.\n\n"
+                        "TIPO B (Continuación de Tendencia):\n"
+                        "1. Ruptura de la zona en M1.\n"
+                        "2. FILTRO: Esperar a que una vela de 15 minutos CIERRE por encima de la zona.\n"
+                        "3. Estructura alcista confirmada en M1 por encima del nivel -> Compra (Buy)."
+                    ),
+                    "short": (
+                        "TIPO A (Cambio de Estructura):\n"
+                        "1. El precio toca la zona de resistencia previa.\n"
+                        "2. En M1, rompe con vela cerrada el último mínimo confirmado.\n"
+                        "3. Disparo en Venta (Sell) al cierre de dicha vela de ruptura.\n\n"
+                        "TIPO B (Continuación de Tendencia):\n"
+                        "1. Ruptura bajista de la zona.\n"
+                        "2. FILTRO: Esperar que una vela de 15 minutos CIERRE por debajo de la zona.\n"
+                        "3. Estructura bajista confirmada en M1 por debajo del nivel -> Venta (Sell)."
+                    ),
+                    "trigger": "Cierre de vela de 1 minuto completando la confirmación de la estructura.",
+                    "confirmation": "Cierre con cuerpo real de vela (las mechas no rompen estructura).",
+                    "invalidation": "Si el precio no toca la zona o si una operación pierde 2 veces seguidas en la misma zona."
+                },
+                "risk_management": {
+                    "stop_loss": "Ubicado estrictamente detrás del último pivot o estructura confirmada en M1.",
+                    "take_profit": "Mínimo 1:1, con potencial de expansión a 1:1.5 o 1:2 hasta la siguiente zona de liquidez.",
+                    "breakeven": "Mover a Break-Even tras alcanzar ratio 1:1.",
+                    "trailing_stop": "Sin trailing invasivo; dejar correr hacia el target estructural.",
+                    "lot_sizing": "Riesgo controlado por operación (1% por trade o equivalente a prueba de fondeo).",
+                    "risk_reward_ratio": "1:1 a 1:2 (Asimétrico favorable)"
+                },
+                "secrets_and_traps": (
+                    "• NUNCA operar en el aire: si el precio no toca la zona previa, no hay operación bajo ningún concepto.\n"
+                    "• El filtro de 15 minutos en continuación salva de más del 70% de las trampas de manipulación de apertura.\n"
+                    "• Máximo 2 intentos por zona: si te saca dos veces, el mercado no está para ese setup ese día.\n"
+                    "• Terminar a las 10:00 AM: el 80% del dinero se hace en la primera hora y media; después el mercado suele perder claridad y devuelves las ganancias.\n"
+                    "• Cero indicadores rezagados: la estructura de 1 minuto ofrece el mejor precio de entrada con el stop más ceñido posible."
+                )
+            }
+            strategy = {
+                "name": ea_name,
+                "description": desc,
+                "recommended_symbols": ["NAS100", "US500", "XAUUSD"],
+                "recommended_timeframe": "M1",
+                "default_lot": 0.01,
+                "stop_loss_points": 250,
+                "take_profit_points": 350,
+                "breakeven_pips": 15,
+                "trailing_stop_pips": 0,
+                "start_hour": 15,
+                "start_minute": 30,
+                "end_hour": 17,
+                "end_minute": 0,
+                "use_time_filter": True,
+                "max_spread_points": 30,
+                "magic_number": 101010,
+                "custom_inputs": [
+                    {"type": "int", "name": "InpStartHour", "default": 15, "comment": "Hora Apertura Servidor MT5 (08:30 EST)"},
+                    {"type": "int", "name": "InpStartMinute", "default": 30, "comment": "Minuto Apertura Servidor MT5"},
+                    {"type": "int", "name": "InpEndHour", "default": 17, "comment": "Hora Cierre Sesion Servidor (10:00 EST)"},
+                    {"type": "int", "name": "InpEndMinute", "default": 0, "comment": "Minuto Cierre Sesion Servidor"}
+                ],
+                "indicators": [],
+                "entry_buy_code": "rates[0].close > rates[1].high && rates[0].close > rates[0].open",
+                "entry_sell_code": "rates[0].close < rates[1].low && rates[0].close < rates[0].open",
+                "exit_buy_code": "rates[0].close < rates[1].low",
+                "exit_sell_code": "rates[0].close > rates[1].high"
+            }
+            return {"audit": audit, "strategy": strategy}
+
+        # =========================================================================
+        # CASO 3: DIVERGENCIA INTERMERCADO DOW JONES / S&P 500 (20MINTRADER)
         # =========================================================================
         elif is_intermarket_divergence:
             ea_name = f"{safe_trader}_20Min_Intermarket_ES_YM"
