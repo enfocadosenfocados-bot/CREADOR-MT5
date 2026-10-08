@@ -431,7 +431,9 @@ void OnTick()
 {{
    int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
    double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
-   double pip_size = (digits == 3 || digits == 5) ? point * 10 : point;
+   double pip_size = point;
+   if(digits == 3 || digits == 5) pip_size = point * 10.0;
+   else if(digits == 2 && point == 0.01) pip_size = 1.0;
 
    // 1. Monitoreo en tiempo real de Break-Even y Trailing Stop
    CheckBreakEvenAndTrailing(pip_size, digits);
@@ -469,17 +471,25 @@ void OnTick()
    // Handle Entries
    int total_positions = CountPositions();
 
+   // Dynamic volume normalization
+   double min_vol = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+   double max_vol = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
+   double step_vol = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
+   double trade_lot = MathMax(min_vol, InpLotSize);
+   if(max_vol > 0 && trade_lot > max_vol) trade_lot = max_vol;
+   if(step_vol > 0) trade_lot = MathFloor(trade_lot / step_vol) * step_vol;
+
    if(signal_buy && total_positions == 0)
    {{
       double sl = (InpStopLossPips > 0) ? NormalizeDouble(ask - (InpStopLossPips * pip_size), digits) : 0;
       double tp = (InpTakeProfitPips > 0) ? NormalizeDouble(ask + (InpTakeProfitPips * pip_size), digits) : 0;
-      m_trade.Buy(InpLotSize, _Symbol, ask, sl, tp, "{safe_name}_BUY");
+      m_trade.Buy(trade_lot, _Symbol, ask, sl, tp, "{safe_name}_BUY");
    }}
    else if(signal_sell && total_positions == 0)
    {{
       double sl = (InpStopLossPips > 0) ? NormalizeDouble(bid + (InpStopLossPips * pip_size), digits) : 0;
       double tp = (InpTakeProfitPips > 0) ? NormalizeDouble(bid - (InpTakeProfitPips * pip_size), digits) : 0;
-      m_trade.Sell(InpLotSize, _Symbol, bid, sl, tp, "{safe_name}_SELL");
+      m_trade.Sell(trade_lot, _Symbol, bid, sl, tp, "{safe_name}_SELL");
    }}
 }}
 //+------------------------------------------------------------------+
